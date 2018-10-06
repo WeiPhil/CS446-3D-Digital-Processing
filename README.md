@@ -1,2 +1,2 @@
-# CS446---3D-Digital-Processing
+# CS446-3D-Digital-Processing
 Git repository with the exercises
