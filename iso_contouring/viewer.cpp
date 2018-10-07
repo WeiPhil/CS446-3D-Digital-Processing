@@ -42,7 +42,7 @@ Scalar Viewer::iso_value(Point v_pos)
     return iso;
 }
 
-/*	@brief	Computes the coordinate of an interpolated point on a given segment [AB]
+/*	@brief	Computes the coordinates of an interpolated point on a given segment [AB]
 
 	The implementation assumes that point A is taken for reference, meaning that the function
 	will return A when p=0 and B when p=1. In our case A should always be the "outlier" point 
@@ -61,7 +61,7 @@ Point interpolatePoint(Point a, Point b, Scalar p) {
 /*	@brief	Computes a simple proportion
 
 	The implementation assumes that isoA is taken for reference, meaning that the function
-	will return 0 isoA=0, whatever isoB's value. In our case isoA should always be the ISO 
+	will return 0 when isoA=0, whatever isoB's value. In our case isoA should always be the ISO 
 	of the "outlier" point in a given triangle, that is the point with a differently signed 
 	ISO value than the others.
 
