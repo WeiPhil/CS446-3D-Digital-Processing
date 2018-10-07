@@ -2,3 +2,10 @@
 /build
 .vscode/
 
+# Visual Studio Bullshit
+*.json
+*.db
+*.suo
+*.VC.openDB
+*.ipch
+*.sqlite

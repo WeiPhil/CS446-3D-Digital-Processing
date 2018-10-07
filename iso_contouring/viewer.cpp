@@ -36,14 +36,42 @@ Scalar Viewer::iso_value(Point v_pos)
 
     // ----- (un)comment a line to change the function you are testing
     //Scalar iso = sqrt(x*x + y*y) - 1;
-    //Scalar iso = sin(2*x+2*y) - cos(4*x*y) +1;
-    Scalar iso = y*y - sin(x*x);
+    Scalar iso = sin(2*x+2*y) - cos(4*x*y) +1;
+    //Scalar iso = y*y - sin(x*x);
 
     return iso;
 }
 
-Scalar lerp(Scalar A,Scalar B,Scalar a,Scalar b){
-    return  ( -A * (b-a)/(B-A) ) - a; 
+/*	@brief	Computes the coordinate of an interpolated point on a given segment [AB]
+
+	The implementation assumes that point A is taken for reference, meaning that the function
+	will return A when p=0 and B when p=1. In our case A should always be the "outlier" point 
+	in a given triangle, that is the point with a differently signed ISO value than the others.
+
+	@param	a	A point (reference, beginning of segment)
+	@param	b	Another point (end of segment)
+	@param	p	The proportion characterizing the interpolation (in [0,1])
+
+	@return	An interpolated point on segment [AB], at proportion p
+*/
+Point interpolatePoint(Point a, Point b, Scalar p) {
+	return (1 - p) * a + p * b;
+}
+
+/*	@brief	Computes a simple proportion
+
+	The implementation assumes that isoA is taken for reference, meaning that the function
+	will return 0 isoA=0, whatever isoB's value. In our case isoA should always be the ISO 
+	of the "outlier" point in a given triangle, that is the point with a differently signed 
+	ISO value than the others.
+
+	@param	isoA	An ISO value (reference)
+	@parma	isoB	Another ISO value
+
+	@return	The "proportion" of isoA in (isoA + isoB)
+*/
+Scalar computeProportion(Scalar isoA, Scalar isoB) {
+	return abs(isoA) / (abs(isoA) + abs(isoB));
 }
 
 void Viewer::calc_iso_contouring() {
@@ -72,83 +100,45 @@ void Viewer::calc_iso_contouring() {
         triangle_ids.push_back(vv);
     }
 
-    //segment_points is defined in viewer.h as std::vector<Point> segment_points;
-    //add points in segment_points forming an edge one after the other;
-    //for example segment_points[0] and segment_points[1] are two points forming the first edge
-    //and segment_points[2] and segment_points[3] are two points forming the second edge
-
-
-
-    /*
-    Classify grid nodes as inside/outside
-        Is below or above iso-value?
-    Classify cell: configura ons
-        in/out for each corner
-    Determine contour edges
-        look-up table for edge configura on
-    Determine vertex posi ons
-        linear interpola on of grid values along edges
-
-    */
-    // ----- add your code here -----
+	// To store the ISO value for each vertex
     std::vector<Scalar> iso_values(mesh.n_vertices());
 
+	// Fill in the iso_values array
     for(auto v: mesh.vertices())
         iso_values[v.idx()] = iso_value(v_positions[v.idx()]);
     
-    for(auto triangle : triangle_ids){
-        // triangle is a set of three indices representing the 3 vertices it composes
-        Scalar iso_1 = iso_values[triangle[0]];
-        Scalar iso_2 = iso_values[triangle[1]];
-        Scalar iso_3 = iso_values[triangle[2]];
-        if (!((iso_1 < 0 && iso_2 < 0  && iso_3 < 0 ) || (iso_1 >= 0 && iso_2 >= 0  && iso_3 >= 0))){
+    for(auto triangle : triangle_ids){ // For each triangle
 
-            if(iso_1 < 0 && iso_2 >= 0){ // case - + - and - + +
-                if(iso_3 < 0){ //case - + -
-                    Scalar xPos1,yPos1,xPos2,yPos2;
-                    if(v_positions[triangle[0]].x < v_positions[triangle[1]].x){
-                        xPos1 = lerp(iso_1,iso_2,v_positions[triangle[0]].x,v_positions[triangle[1]].x);
-                    }else{
-                        xPos1 = lerp(iso_1,iso_2,v_positions[triangle[1]].x,v_positions[triangle[0]].x);
-                    }
+        // Get the 3 vertices
+		Point vertex0 = v_positions[triangle[0]];
+		Point vertex1 = v_positions[triangle[1]];
+		Point vertex2 = v_positions[triangle[2]];
 
-                    if(v_positions[triangle[0]].y < v_positions[triangle[1]].y){
-                        yPos1 = lerp(iso_1,iso_2,v_positions[triangle[0]].y,v_positions[triangle[1]].y);
-                    }else{
-                        yPos1 = lerp(iso_1,iso_2,v_positions[triangle[1]].y,v_positions[triangle[0]].y);
-                    }
+		// Get the 3 ISO values
+        Scalar iso0 = iso_values[triangle[0]];
+        Scalar iso1 = iso_values[triangle[1]];
+        Scalar iso2 = iso_values[triangle[2]];
 
-                    if(v_positions[triangle[1]].x < v_positions[triangle[2]].x){
-                        xPos2 = lerp(iso_1,iso_2,v_positions[triangle[1]].x,v_positions[triangle[2]].x);
-                    }else{
-                        xPos2 = lerp(iso_1,iso_2,v_positions[triangle[2]].x,v_positions[triangle[1]].x);
-                    }
-
-                    if(v_positions[triangle[1]].y < v_positions[triangle[2]].y){
-                        yPos2 = lerp(iso_1,iso_2,v_positions[triangle[1]].y,v_positions[triangle[2]].y);
-                    }else{
-                        yPos2 = lerp(iso_1,iso_2,v_positions[triangle[2]].y,v_positions[triangle[1]].y);
-                    }
-
-                    segment_points.push_back(Point(xPos1,yPos1,0.0));
-                    segment_points.push_back(Point(xPos2,yPos2,0.0));
-
-
-
-                }else{ //case - + +
-
-                }
-            
-            }
-            else if(iso_1 >= 0 && iso_2 < 0){ // case - + - and - + +
-
-            }
-
-
-        }
+		if ((iso0 > 0 && iso1 > 0 && iso2 > 0) || (iso0 <= 0 && iso1 <= 0 && iso2 <= 0)) {
+			// Nothing to do
+		}
+		else if ((iso0 <= 0 && iso1 > 0 && iso2 > 0) || (iso0 > 0 && iso1 <= 0 && iso2 <= 0)) {
+			// Point 0 is the "outlier"
+			segment_points.push_back(interpolatePoint(vertex0, vertex1, computeProportion(iso0, iso1)));
+			segment_points.push_back(interpolatePoint(vertex0, vertex2, computeProportion(iso0, iso2)));
+		}
+		else if ((iso0 > 0 && iso1 <= 0 && iso2 > 0) || (iso0 <= 0 && iso1 > 0 && iso2 <= 0)) {
+			// Point 1 is the "outlier"
+			segment_points.push_back(interpolatePoint(vertex1, vertex0, computeProportion(iso1, iso0)));
+			segment_points.push_back(interpolatePoint(vertex1, vertex2, computeProportion(iso1, iso2)));
+		}
+		else if ((iso0 > 0 && iso1 > 0 && iso2 <= 0) || (iso0 <= 0 && iso1 <= 0 && iso2 > 0)) {
+			// Point 2 is the "outlier"
+			segment_points.push_back(interpolatePoint(vertex2, vertex0, computeProportion(iso2, iso0)));
+			segment_points.push_back(interpolatePoint(vertex2, vertex1, computeProportion(iso2, iso1)));
+		}
+		else {
+			// Should never happen
+		}
     }
-
-
-
-    // ------------------------------
 }
