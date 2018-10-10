@@ -1,6 +1,8 @@
 .DS_Store
-/build
-.vscode/
+
+#Philippe's Bullshit
+*/build
+*.vscode/
 
 # Visual Studio Bullshit
 *.json
