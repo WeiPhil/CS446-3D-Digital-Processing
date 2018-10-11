@@ -24,9 +24,18 @@ struct MainWindow : public TrackballWindow {
 // Hint : try to play with epsilon
 // ============================================================================
   // time step for smoothing
-  double epsilon = 0.001;
+  double epsilon = 0.1;
 
   void laplacianSmoothing() {
+
+    MatMxN pointsCopy = points;
+
+    points.col(0) = (1-epsilon) * pointsCopy.col(0) + epsilon * ( pointsCopy.col(num_points-1) + pointsCopy.col(1) )/2 ;
+    for (int i = 1; i < num_points-1; ++i){
+      points.col(i) = (1-epsilon) * pointsCopy.col(i) + epsilon * ( pointsCopy.col(i-1) + pointsCopy.col(i+1) )/2 ;
+    }
+    points.col(num_points-1) = (1-epsilon) * pointsCopy.col(num_points-1) + epsilon * ( pointsCopy.col(num_points-2) + pointsCopy.col(0) )/2 ;
+
     // Curve Smoothing - centroid (this function should do one iteration of smoothing)
   }
 
