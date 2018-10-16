@@ -32,9 +32,8 @@ struct MainWindow : public TrackballWindow {
 	// Time step for smoothing
 	double epsilon = 0.1;
 
-
 	/*	@brief	Computes the Euclidian distance between 2 points in 3-dimensional space
-	
+
 		@param	a	A 3D point
 		@parma	b	Another 3D point
 
@@ -44,14 +43,25 @@ struct MainWindow : public TrackballWindow {
 		return sqrt(a.x()*a.x() + b.x()*b.x());
 	}
 
+	/*	@brief	Creates a 3D point from a column of the polyline matrix
+
+		@param	polyline	The polyline to consider
+		@param	index		The index of the point to consider
+
+		@return	A 3D point corresponding to the index-th column of the polyline matrix
+	*/
+	Point extendPoint(const MatMxN &polyline, size_t index) {
+		return Point(polyline(0, index), polyline(1, index), 0.f);
+	}
+
 	/*	@brief	Creates a 3D point from a column of the "points" matrix
 
-		@param	index	The index of the point to consider
+		@param	index		The index of the point to consider
 
 		@return	A 3D point corresponding to the index-th column of the "points" matrix
 	*/
 	Point extendPoint(size_t index) {
-		return Point(points(0, index), points(1, index), 0.f);
+		return extendPoint(points, index);
 	}
 
 	/*	@brief	Computes the length of the polyline represented by "points"
@@ -78,7 +88,7 @@ struct MainWindow : public TrackballWindow {
 	Point getPolylineCentroid() {
 
 		// Sum up the coordinates
-		double x, y = 0.f;
+		float x, y = 0.f;
 		for (size_t i = 0; i < num_points; ++i) {
 			x += points(0, i);
 			y += points(1, i);
@@ -88,101 +98,122 @@ struct MainWindow : public TrackballWindow {
 		return Point(x / num_points, y / num_points, 0.f);
 	}
 
-	void laplacianSmoothing() {
+	/*	@brief	Rescales the polyline "points" by a certain factor
+
+		@param	scalingFactor	The scaling factor
+		@return	void
+	*/
+	void rescalePolyline(double scalingFactor) {
 
 		// Get current centroid
 		Point centroid = getPolylineCentroid();
-
-		// Create a local copy of the polyline
-		MatMxN pointsCopy = points;
-
-		// Compute the coordinates of the new points
-		points.col(0) = ((1 - epsilon) * pointsCopy.col(0)) + epsilon * ((pointsCopy.col(num_points - 1) + pointsCopy.col(1)) / 2);
-		for (size_t i = 1; i < num_points - 1; ++i) {
-			points.col(i) = ((1 - epsilon) * pointsCopy.col(i)) + epsilon * ((pointsCopy.col(i - 1) + pointsCopy.col(i + 1)) / 2);
-		}
-		points.col(num_points - 1) = ((1 - epsilon) * pointsCopy.col(num_points - 1)) + epsilon * ((pointsCopy.col(num_points - 2) + pointsCopy.col(0)) / 2);
-
-		// Compute length ratio
-		double newLength = getPolylineLength();
-		double lengthRatio = originalLength / newLength;
 
 		// Rescale the new polyline
 		for (size_t i = 0; i < num_points; ++i) {
 
 			// Compute new point
 			Eigen::Vector3f vectorFromCentroid = extendPoint(i) - centroid;
-			Point newPoint = centroid + (vectorFromCentroid * lengthRatio);
+			Point newPoint = centroid + (vectorFromCentroid * scalingFactor);
 
 			// Update current point
 			points(0, i) = newPoint.x();
 			points(1, i) = newPoint.y();
 		}
-
 	}
 
-	Point calculateCircumscribed(const Point &p1, const Point &p2, const Point &p3) {
-		// c : circumscribed circle
-		Point c = Point(0.f, 0.f, 0.f);
+	/*	@brief	Updates the coordinates of a point using Laplacian smoothing
 
-		float u = (p3.x()*p3.x() - p2.x()*p2.x() + p3.y()*p3.y() - p2.y()*p2.y()) / (2 * (p3.y() - p2.y()));
-		float v = (p2.x()*p2.x() - p1.x()*p1.x() + p2.y()*p2.y() - p1.y()*p1.y()) / (2 * (p2.y() - p1.y()));
-		float w = (((p2.x() - p1.x()) / (p2.y() - p1.y())) - ((p3.x() - p2.x()) / (p3.y() - p2.y())));
+		@param	polyline	The polyline of reference
+		@param	indexLow	Index of previous vertex
+		@param	indexCur	Index of current vertex (the one being updated)
+		@param	indexHigh	Index of next vertex
+	*/
+	void updatePointLaplacian(const MatMxN &polyline, size_t indexLow, size_t indexCur, size_t indexHigh) {
+		points.col(indexCur) = ((1 - epsilon) * polyline.col(indexCur)) +
+			epsilon * ((polyline.col(indexLow) + polyline.col(indexHigh)) / 2);
+	}
 
-		c.x() = (u - v) / w;
-		c.y() = (-(p2.x() - p1.x()) / (p2.y() - p1.y())) * c.x() + v;
+	void laplacianSmoothing() {
 
-		return c;
+		// Create a local copy of the polyline
+		MatMxN pointsCopy = points;
+
+		// Compute the coordinates of the new points
+		updatePointLaplacian(pointsCopy, num_points - 1, 0, 1);
+		for (size_t i = 1; i < num_points - 1; ++i) {
+			updatePointLaplacian(pointsCopy, i - 1, i, i + 1);
+		}
+		updatePointLaplacian(pointsCopy, num_points - 2, num_points - 1, 0);
+
+		// Rescale the polyline
+		rescalePolyline(originalLength / getPolylineLength());
+	}
+
+	/*	@brief	Computes the center coordinates of the circumscrubed circle to triangle ABC
+
+		@param	a	Point A
+		@param	b	Point B
+		@param	c	Point C
+
+		@return	The center coordinates of the circumscrubed circle to triangle ABC
+	*/
+	Point computeCircumscribed(const Point &a, const Point &b, const Point &c) {
+
+		double d = 2 * (
+			a.x() * (b.y() - c.y()) +
+			b.x() * (c.y() - a.y()) +
+			c.x() * (a.y() - b.y())
+			);
+		double u = (1.f / d) * (
+			(pow(a.x(), 2) + pow(a.y(), 2)) * (b.y() - c.y()) +
+			(pow(b.x(), 2) + pow(b.y(), 2)) * (c.y() - a.y()) +
+			(pow(c.x(), 2) + pow(c.y(), 2)) * (a.y() - b.y())
+			);
+		double v = (1.f / d) * (
+			(pow(a.x(), 2) + pow(a.y(), 2)) * (c.x() - b.x()) +
+			(pow(b.x(), 2) + pow(b.y(), 2)) * (a.x() - c.x()) +
+			(pow(c.x(), 2) + pow(c.y(), 2)) * (b.x() - a.x())
+			);
+
+		return Point(u, v, 0.f);
+	}
+
+	/*	@brief	Updates the coordinates of a point using oscularing circle smoothing
+
+		@param	polyline	The polyline of reference
+		@param	indexLow	Index of previous vertex
+		@param	indexCur	Index of current vertex (the one being updated)
+		@param	indexHigh	Index of next vertex
+
+		@return	void
+	*/
+	void updatePointOsculating(const MatMxN &polyline, size_t indexLow, size_t indexCur, size_t indexHigh) {
+		Point v = extendPoint(polyline, indexCur);
+		Point center = computeCircumscribed(
+			extendPoint(polyline, indexLow),
+			v,
+			extendPoint(polyline, indexHigh)
+		);
+		Point newPoint = v + epsilon * ((center - v) / (center - v).squaredNorm());
+		points(0, indexCur) = newPoint.x();
+		points(1, indexCur) = newPoint.y();
 	}
 
 	void osculatingCircle() {
 
-		Point p1 = Point(points(0, num_points - 1), points(1, num_points - 1), 0.0f);
-		Point p2 = Point(points(0, 0), points(1, 0), 0.0f);
-		Point p3 = Point(points(0, 1), points(1, 1), 0.0f);
+		// Create a local copy of the polyline
+		MatMxN pointsCopy = points;
 
-		Point c = calculateCircumscribed(p1, p2, p3);
-
-		Point newPoint = p2 + epsilon * (c - p2) / (c - p2).squaredNorm();
-
-		points(0, 0) = newPoint.x();
-		points(1, 0) = newPoint.y();
-
-		for (int i = 1; i < num_points - 1; ++i) {
-			p1 = Point(points(0, i - 1), points(1, i - 1), 0.0f);
-			p2 = Point(points(0, i), points(1, i), 0.0f);
-			p3 = Point(points(0, i + 1), points(1, i + 1), 0.0f);
-
-			c = calculateCircumscribed(p1, p2, p3);
-
-			newPoint = p2 + epsilon * (c - p2) / (c - p2).squaredNorm();
-
-			points(0, i) = newPoint.x();
-			points(1, i) = newPoint.y();
+		// Compute the coordinates of the new points
+		updatePointOsculating(pointsCopy, num_points - 1, 0, 1);
+		for (size_t i = 1; i < num_points - 1; ++i) {
+			updatePointOsculating(pointsCopy, i - 1, i, i + 1);
 		}
+		updatePointOsculating(pointsCopy, num_points - 2, num_points - 1, 0);
 
-		p1 = Point(points(0, num_points - 2), points(1, num_points - 2), 0.0f);
-		p2 = Point(points(0, num_points - 1), points(1, num_points - 1), 0.0f);
-		p3 = Point(points(0, 0), points(1, 0), 0.0f);
-
-		c = calculateCircumscribed(p1, p2, p3);
-
-		newPoint = p2 + epsilon * (c - p2) / (c - p2).squaredNorm();
-
-		points(0, num_points - 1) = newPoint.x();
-		points(1, num_points - 1) = newPoint.y();
-
-		// std::cout << c.x() << " " << c.y() << " " << c.z() << std::endl;
-
-
-		// RESCALE HERE
-
-		// Curve Smoothing - osculating circle (again, this function should do one iteration of smoothing)
+		// Rescale the polyline
+		rescalePolyline(originalLength / getPolylineLength());
 	}
-
-	// ============================================================================
-	// END OF Exercise 2 (do not thouch the rest of the code)
-	// ============================================================================
 
 	void generateRandomizedClosedPolyline() {
 		std::default_random_engine generator;
@@ -199,7 +230,7 @@ struct MainWindow : public TrackballWindow {
 		}
 
 		/* We remember the original length of the polyline here. Otherwise if we
-		try to recompute it at every iteration of the smoothing algorithm the 
+		try to recompute it at every iteration of the smoothing algorithm the
 		floating-point approximation error accumulates and the shapes end-up shrinking.*/
 		originalLength = getPolylineLength();
 
@@ -272,7 +303,6 @@ struct MainWindow : public TrackballWindow {
 		return true;
 	}
 };
-
 
 int main(int argc, char** argv)
 {
