@@ -271,7 +271,7 @@ struct MainWindow : public TrackballWindow {
 		}
 		else if (key == GLFW_KEY_C && action == GLFW_RELEASE)
 		{
-			for (size_t i = 0 ; i < 20 ; ++i)
+			//for (size_t i = 0 ; i < 20 ; ++i)
 			osculatingCircle();
 		}
 		else if (key == GLFW_KEY_1 && action == GLFW_RELEASE)

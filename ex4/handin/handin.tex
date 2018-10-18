@@ -70,5 +70,13 @@ Hence the upper slice $S_1$ is always the most profitable one. In the $N=2$ case
 
 \section{Coding Exercise}
 
+Some notes about our code:
+\begin{itemize}
+\item We added a field to the \texttt{MainWindow} structure to store the polyline's length when it's created. Otherwise, if we tried to re-compute the length at each iteration the polyline would eventually end up shrinking because of the accumulation of floating-point errors.
+\item We use a different $\epsilon$ for each smoothing method. $\epsilon = 0.1$ for \textbf{Laplacian smoothing} whereas $\epsilon = 0.00003$ for \textbf{osculating circle smoothing}. Because the epsilon is really small for the second method, we would recommend increasing the number of iterations executed each time the "$C$" key is pressed in order to speedup smoothing (20 iterations per key press seems reasonable).
+\item We find that, to obtain a good end result, it is beneficial to start with \textbf{osculating circle smoothing} and to switch to \textbf{Laplacian smoothing} once the shape is more or less circle-shaped.
+\end{itemize}
+
+
 
 \end{document}
