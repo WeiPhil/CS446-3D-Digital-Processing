@@ -26,7 +26,7 @@ struct MainWindow : public TrackballWindow {
 	double epsilonLaplacian = 0.1;
 
 	// Time step for osculating circle smoothing
-	double epsilonOsculating = 0.0001;
+	double epsilonOsculating = 0.00005;
 
 	/*	@brief	Computes the Euclidian distance between 2 points in 3-dimensional space
 
@@ -184,14 +184,15 @@ struct MainWindow : public TrackballWindow {
 		@return	void
 	*/
 	void updatePointOsculating(const MatMxN &polyline, size_t indexLow, size_t indexCur, size_t indexHigh) {
+
 		Point v = extendPoint(polyline, indexCur);
 		Point center = computeCircumscribed(
 			extendPoint(polyline, indexLow),
 			v,
 			extendPoint(polyline, indexHigh)
 		);
-		
-		Point newPoint = v + (epsilonOsculating * ( (center - v) / (center - v).squaredNorm() ));
+
+		Point newPoint = v + (epsilonOsculating * ((center - v) / (center - v).squaredNorm()));
 		points(0, indexCur) = newPoint.x();
 		points(1, indexCur) = newPoint.y();
 	}
@@ -211,7 +212,10 @@ struct MainWindow : public TrackballWindow {
 		updatePointOsculating(pointsCopy, num_points - 2, num_points - 1, 0);
 
 		// Rescale the polyline
-		rescalePolyline(originalLength / getPolylineLength());
+		double scalingFactor = originalLength / getPolylineLength();
+		if (scalingFactor > 1) { // Only scale up
+			rescalePolyline(scalingFactor);
+		}
 	}
 
 	void generateRandomizedClosedPolyline() {
