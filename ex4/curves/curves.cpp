@@ -26,7 +26,7 @@ struct MainWindow : public TrackballWindow {
 	double epsilonLaplacian = 0.1;
 
 	// Time step for osculating circle smoothing
-	double epsilonOsculating = 0.00005;
+	double epsilonOsculating = 0.00003;
 
 	/*	@brief	Computes the Euclidian distance between 2 points in 3-dimensional space
 
@@ -160,16 +160,16 @@ struct MainWindow : public TrackballWindow {
 			b.x() * (c.y() - a.y()) +
 			c.x() * (a.y() - b.y())
 			);
-		double u = (1.f / d) * (
+		double u = (
 			(a.x()*a.x() + a.y()*a.y()) * (b.y() - c.y()) +
 			(b.x()*b.x() + b.y()*b.y()) * (c.y() - a.y()) +
 			(c.x()*c.x() + c.y()*c.y()) * (a.y() - b.y())
-			);
-		double v = (1.f / d) * (
+			) / d;
+		double v = (
 			(a.x()*a.x() + a.y()*a.y()) * (c.x() - b.x()) +
 			(b.x()*b.x() + b.y()*b.y()) * (a.x() - c.x()) +
 			(c.x()*c.x() + c.y()*c.y()) * (b.x() - a.x())
-			);
+			) / d;
 
 		return Point(u, v, 0.f);
 	}
@@ -271,8 +271,7 @@ struct MainWindow : public TrackballWindow {
 		}
 		else if (key == GLFW_KEY_C && action == GLFW_RELEASE)
 		{
-			std::cout << "Length: " << getPolylineLength() << std::endl;
-			for (size_t i = 0 ; i < 5 ; ++i)
+			for (size_t i = 0 ; i < 20 ; ++i)
 			osculatingCircle();
 		}
 		else if (key == GLFW_KEY_1 && action == GLFW_RELEASE)

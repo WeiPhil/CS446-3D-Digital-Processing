@@ -1,0 +1,74 @@
+\documentclass{article}
+
+%% ---- Packages ----
+\usepackage[left=3cm,right=3cm,top=2cm,bottom=2cm]{geometry} % page settings
+\usepackage{amsmath} % provides many mathematical environments & tools
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage[]{algorithm2e}
+\usepackage{mathtools}
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+\usepackage{cancel}
+%% ---- Packages ----
+
+
+%% ---- Theorems style ----
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{corollary}{Corollary}[theorem]
+\newtheorem{lemma}{Lemma}[section]
+
+\theoremstyle{definition}
+\newtheorem*{remark}{Remark}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+
+\theoremstyle{definition}
+\newtheorem*{example}{Example}
+%% ---- Theorems style ----
+
+\setlength{\parindent}{0mm}
+
+\title{CS-446 - Digital 3D Geometry Processing\\Assignment 4}
+\author{Maxime Pisa, Lucas Ramirez, Philippe Weier}       
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Theory Exercise}
+\subsection{Curvature of Curves}
+\begin{itemize}
+\item $k_1(s)=\frac{s^2-1}{s^2+1}$\\
+
+This function corresponds to curve \textbf{d}. We see that the function is symmetric around 0, meaning that $\forall s\in\mathbb{R}^+, \ k_1(s)=k_1(-s)$. Hence the representation must also be symmetric around the line $x=0$. Secondly, we observe that $\lim_{s\rightarrow\infty} k_1(s) = \lim_{s\rightarrow - \infty} k_1(s) = 1$, so on both ends the curve must shape like a non-shrinking unit circle, which is only the case for curve \textbf{d}.
+\item $k_2(s)=s$\\
+
+This function corresponds to curve \textbf{a}. Again the function is symmetric around 0, so the representation must also be symmetric around the line $x=0$. The curvature linearly tends to $\pm \infty$ when $s\rightarrow\pm\infty$, so on both ends the curve must shape like a shrinking unit circle, which is only the case for curve \textbf{a}.
+\item $k_3(s)=s^3-4s$\\
+
+This function corresponds to curve \textbf{c}. The funcion is not symmetric around 0, so the representation  must also not be symmetric around the line $x=0$. This is only the case for curve \textbf{c}.
+\item $k_4(s)=\sin(s)\cdot s$\\
+
+This function corresponds to curve \textbf{b} (by default). The curvature is divergent at both infinities because of the $\sin$ function. It also makes the curvature equal 0 periodically (every $2\pi$), changing its sign every period. This is only the case for curve \textbf{b}.
+\end{itemize}
+
+\subsection{Surfaces Area}
+
+We directly consider the general problem with $N$ slices. We denote by $S_i$ the slice of index $i\in\lbrace 1,2,\ldots,N\rbrace$, starting from the half-dome's top (this means that slice $S_1$ is the upper slice).\\
+
+We need to compute the area $f(i)$ associated to each slice $S_i$. We denote by $R$ the half-dome's radius.
+$$ f(i) = \int_{\frac{i-1}{R}}^{\frac{i}{R}} \left( 2\pi\cdot R \right) dr = \pi \left[ \left(\frac{i}{R}\right)^2 - \left(\frac{i - 1}{R}\right)^2 \right] = \pi \cdot \frac{2i + 1}{R^2}$$
+The most profitable slice is the one with the lowest area:
+$$ \min_{i\in\lbrace 1,\ldots,N\rbrace } f(i) = f(1) = \frac{3\pi}{R^2} $$
+Hence the upper slice $S_1$ is always the most profitable one. In the $N=2$ case one must pick \textit{Part A} to make the most profit.
+
+\section{Coding Exercise}
+
+
+\end{document}

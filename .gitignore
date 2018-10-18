@@ -12,3 +12,8 @@
 *.ipch
 *.sqlite
 */enc_temp_folder/*/*.cpp
+
+# Handin
+*/handin/*.aux
+*/handin/*.log
+*/handin/*.synctex.gz
