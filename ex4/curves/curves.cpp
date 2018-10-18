@@ -22,15 +22,11 @@ struct MainWindow : public TrackballWindow {
 	floating-point approximation error accumulates and the shapes end-up shrinking.*/
 	double originalLength = 0.f;
 
-	// ============================================================================
-	// Exercise 2 : fill the 2 functions below (see PDF for instructions)
-	// To test your implementation, use the S key for laplacian smoothing and the
-	// C key for the osculating circle.
-	// Hint : try to play with epsilon
-	// ============================================================================
+	// Time step for Laplacian smoothing
+	double epsilonLaplacian = 0.1;
 
-	// Time step for smoothing
-	double epsilon = 0.1;
+	// Time step for osculating circle smoothing
+	double epsilonOsculating = 0.0001;
 
 	/*	@brief	Computes the Euclidian distance between 2 points in 3-dimensional space
 
@@ -88,7 +84,7 @@ struct MainWindow : public TrackballWindow {
 	Point getPolylineCentroid() {
 
 		// Sum up the coordinates
-		float x, y = 0.f;
+		float x = 0.f, y = 0.f;
 		for (size_t i = 0; i < num_points; ++i) {
 			x += points(0, i);
 			y += points(1, i);
@@ -129,8 +125,8 @@ struct MainWindow : public TrackballWindow {
 		@param	indexHigh	Index of next vertex
 	*/
 	void updatePointLaplacian(const MatMxN &polyline, size_t indexLow, size_t indexCur, size_t indexHigh) {
-		points.col(indexCur) = ((1 - epsilon) * polyline.col(indexCur)) +
-			epsilon * ((polyline.col(indexLow) + polyline.col(indexHigh)) / 2);
+		points.col(indexCur) = ((1 - epsilonLaplacian) * polyline.col(indexCur)) +
+			epsilonLaplacian * ((polyline.col(indexLow) + polyline.col(indexHigh)) / 2);
 	}
 
 	void laplacianSmoothing() {
@@ -165,14 +161,14 @@ struct MainWindow : public TrackballWindow {
 			c.x() * (a.y() - b.y())
 			);
 		double u = (1.f / d) * (
-			(pow(a.x(), 2) + pow(a.y(), 2)) * (b.y() - c.y()) +
-			(pow(b.x(), 2) + pow(b.y(), 2)) * (c.y() - a.y()) +
-			(pow(c.x(), 2) + pow(c.y(), 2)) * (a.y() - b.y())
+			(a.x()*a.x() + a.y()*a.y()) * (b.y() - c.y()) +
+			(b.x()*b.x() + b.y()*b.y()) * (c.y() - a.y()) +
+			(c.x()*c.x() + c.y()*c.y()) * (a.y() - b.y())
 			);
 		double v = (1.f / d) * (
-			(pow(a.x(), 2) + pow(a.y(), 2)) * (c.x() - b.x()) +
-			(pow(b.x(), 2) + pow(b.y(), 2)) * (a.x() - c.x()) +
-			(pow(c.x(), 2) + pow(c.y(), 2)) * (b.x() - a.x())
+			(a.x()*a.x() + a.y()*a.y()) * (c.x() - b.x()) +
+			(b.x()*b.x() + b.y()*b.y()) * (a.x() - c.x()) +
+			(c.x()*c.x() + c.y()*c.y()) * (b.x() - a.x())
 			);
 
 		return Point(u, v, 0.f);
@@ -194,7 +190,8 @@ struct MainWindow : public TrackballWindow {
 			v,
 			extendPoint(polyline, indexHigh)
 		);
-		Point newPoint = v + epsilon * ((center - v) / (center - v).squaredNorm());
+		
+		Point newPoint = v + (epsilonOsculating * ( (center - v) / (center - v).squaredNorm() ));
 		points(0, indexCur) = newPoint.x();
 		points(1, indexCur) = newPoint.y();
 	}
@@ -203,6 +200,8 @@ struct MainWindow : public TrackballWindow {
 
 		// Create a local copy of the polyline
 		MatMxN pointsCopy = points;
+
+		double length = getPolylineLength();
 
 		// Compute the coordinates of the new points
 		updatePointOsculating(pointsCopy, num_points - 1, 0, 1);
@@ -233,7 +232,6 @@ struct MainWindow : public TrackballWindow {
 		try to recompute it at every iteration of the smoothing algorithm the
 		floating-point approximation error accumulates and the shapes end-up shrinking.*/
 		originalLength = getPolylineLength();
-
 	}
 
 	void render() {
@@ -265,13 +263,12 @@ struct MainWindow : public TrackballWindow {
 		TrackballWindow::key_callback(key, scancode, action, mods);
 		if (key == GLFW_KEY_S && action == GLFW_RELEASE)
 		{
-			// TODO: remove!
-			for (int i = 0; i < 10; ++i) {
-				laplacianSmoothing();
-			}
+			laplacianSmoothing();
 		}
 		else if (key == GLFW_KEY_C && action == GLFW_RELEASE)
 		{
+			std::cout << "Length: " << getPolylineLength() << std::endl;
+			for (size_t i = 0 ; i < 5 ; ++i)
 			osculatingCircle();
 		}
 		else if (key == GLFW_KEY_1 && action == GLFW_RELEASE)

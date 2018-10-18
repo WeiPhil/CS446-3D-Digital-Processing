@@ -11,3 +11,4 @@
 *.VC.openDB
 *.ipch
 *.sqlite
+*/enc_temp_folder/*/*.cpp
