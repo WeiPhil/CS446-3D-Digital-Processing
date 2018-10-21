@@ -65,6 +65,11 @@ public:
         meshProcess();
     }
 
+    // Own headers
+    std::tuple<Normal,Scalar> computeNormalOfFaceAndArea(Surface_mesh::Vertex_around_face_circulator fv_c);
+    std::tuple<Normal,Scalar> computeNormalOfFaceAndAngle(Surface_mesh::Vertex_around_face_circulator fv_c);
+    Normal computeNormalOfFace(Surface_mesh::Vertex_around_face_circulator fv_c);
+
     void computeValence();
     void computeNormalsWithConstantWeights();
     void computeNormalsByAreaWeights();

@@ -105,6 +105,36 @@ void Viewer::computeValence() {
         vertex_valence[v] = mesh.valence(v);
     }
 }
+
+std::tuple<Normal,Scalar> Viewer::computeNormalOfFaceAndArea(Mesh::Vertex_around_face_circulator fv_c){
+
+    const Point& xi = mesh.position(*fv_c);  ++fv_c;
+    const Point& xj = mesh.position(*fv_c);  ++fv_c;
+    const Point& xk = mesh.position(*fv_c);
+
+    Point crossProduct = cross(xj-xi,xk-xi);
+    Scalar area = norm(crossProduct) * 0.5f;
+
+    return std::make_tuple(crossProduct.normalize(), area);
+}
+
+std::tuple<Normal,Scalar> Viewer::computeNormalOfFaceAndAngle(Mesh::Vertex_around_face_circulator fv_c){
+
+    const Point& xi = mesh.position(*fv_c);  ++fv_c;
+    const Point& xj = mesh.position(*fv_c);  ++fv_c;
+    const Point& xk = mesh.position(*fv_c);
+
+    return std::make_tuple(cross(xj-xi,xk-xi).normalize(), std::acos(dot((xj-xi).normalize(), (xk-xi).normalize()) ) );
+}
+
+Normal Viewer::computeNormalOfFace(Mesh::Vertex_around_face_circulator fv_c){
+
+    const Point& xi = mesh.position(*fv_c);  ++fv_c;
+    const Point& xj = mesh.position(*fv_c);  ++fv_c;
+    const Point& xk = mesh.position(*fv_c);
+
+    return cross(xj-xi,xk-xi).normalize();
+}
 // ========================================================================
 // EXERCISE 1.1
 // ========================================================================
@@ -113,10 +143,37 @@ void Viewer::computeNormalsWithConstantWeights() {
     Mesh::Vertex_property<Point> v_cste_weights_n =
             mesh.vertex_property<Point>("v:cste_weights_n", default_normal);
 
-    // ------------- IMPLEMENT HERE ---------
-    // Compute the normals for each vertex v in the mesh using the constant weights
-    // technique (see .pdf) and store it inside v_cste_weights_n[v]
-    // ------------- IMPLEMENT HERE ---------
+    Mesh::Vertex_around_face_circulator fv_c;
+    Mesh::Face_around_vertex_circulator vf_c, vf_end;
+
+    for (auto v: mesh.vertices()){
+        
+        vf_c = mesh.faces(v);
+        
+        if(!vf_c) {
+            continue;
+        }
+
+        vf_end = vf_c;
+
+        std::vector<Normal> face_normals;
+
+        do {
+            fv_c = mesh.vertices(*vf_c);
+
+            face_normals.push_back(computeNormalOfFace(fv_c));
+
+        } while(++vf_c != vf_end);
+
+        Normal vertexNormal = default_normal;
+        for(auto n : face_normals){
+            vertexNormal += n;
+        }
+
+        v_cste_weights_n[v] = vertexNormal.normalize(); 
+       
+    }
+
 }
 // ========================================================================
 // EXERCISE 1.2
@@ -126,10 +183,36 @@ void Viewer::computeNormalsByAreaWeights() {
     Mesh::Vertex_property<Point> v_area_weights_n =
             mesh.vertex_property<Point>("v:area_weight_n", default_normal);
 
-    // ------------- IMPLEMENT HERE ---------
-    // Compute the normals for each vertex v in the mesh using the weights proportionals
-    // to the areas technique (see .pdf) and store inside v_area_weights_n[v]
-    // ------------- IMPLEMENT HERE ---------
+    Mesh::Vertex_around_face_circulator fv_c;
+    Mesh::Face_around_vertex_circulator vf_c, vf_end;
+
+    for (auto v: mesh.vertices()){
+        
+        vf_c = mesh.faces(v);
+        
+        if(!vf_c) {
+            continue;
+        }
+
+        vf_end = vf_c;
+
+        std::vector<std::tuple<Normal,Scalar>> face_normals_area;
+
+        do {
+            fv_c = mesh.vertices(*vf_c);
+
+            face_normals_area.push_back(computeNormalOfFaceAndArea(fv_c));
+
+        } while(++vf_c != vf_end);
+
+        Normal vertexNormal = default_normal;
+        
+        for(auto n : face_normals_area){
+            vertexNormal += (std::get<0>(n) * std::get<1>(n) );
+        }
+        v_area_weights_n[v] = vertexNormal.normalize(); 
+       
+    }
 }
 // ========================================================================
 // EXERCISE 1.3
@@ -139,6 +222,36 @@ void Viewer::computeNormalsWithAngleWeights() {
     Mesh::Vertex_property<Point> v_angle_weights_n =
             mesh.vertex_property<Point>("v:angle_weight_n", default_normal);
 
+    Mesh::Vertex_around_face_circulator fv_c;
+    Mesh::Face_around_vertex_circulator vf_c, vf_end;
+
+    for (auto v: mesh.vertices()){
+        
+        vf_c = mesh.faces(v);
+        
+        if(!vf_c) {
+            continue;
+        }
+
+        vf_end = vf_c;
+
+        std::vector<std::tuple<Normal,Scalar>> face_normals_angle;
+
+        do {
+            fv_c = mesh.vertices(*vf_c);
+
+            face_normals_angle.push_back(computeNormalOfFaceAndAngle(fv_c));
+
+        } while(++vf_c != vf_end);
+
+        Normal vertexNormal = default_normal;
+        for(auto n : face_normals_angle){
+            vertexNormal += std::get<0>(n)*std::get<1>(n);
+        }
+
+        v_angle_weights_n[v] = vertexNormal.normalize(); 
+       
+    }
     // ------------- IMPLEMENT HERE ---------
     // Compute the normals for each vertex v in the mesh using the weights proportionals
     // to the angles technique (see .pdf) and store it inside v_angle_weights_n[v]
