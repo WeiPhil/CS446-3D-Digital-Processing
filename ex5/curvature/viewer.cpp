@@ -230,6 +230,7 @@ void Viewer::computeNormalsWithAngleWeights() {
         vf_c = mesh.faces(v);
         
         if(!vf_c) {
+            cout << "No faces?" << endl;
             continue;
         }
 
@@ -267,6 +268,39 @@ void Viewer::calc_uniform_laplacian() {
     min_uniLaplace = 1000;
     max_uniLaplace = -1000;
 
+    // Need to test if a vertex is a boundary vertex, if it is not we can calculate the uniform laplacian
+
+    for (auto v: mesh.vertices()){
+        
+        vv_c = mesh.vertices(v);
+        
+        if(!vv_c) {
+            continue;
+        }
+
+        vv_end = vv_c;
+
+        const Point& refPoint = mesh.position(v);
+
+        int numVertices = 0;
+    
+        do {
+            ++ numVertices;
+            const Point& vi = mesh.position(*vv_c);
+            laplace += refPoint - vi ;
+        } while(++vv_c != vv_end);
+
+        laplace = laplace/numVertices;
+
+        v_uniLaplace[v] = norm(laplace);
+
+        if(min_uniLaplace > v_uniLaplace[v])
+            min_uniLaplace = v_uniLaplace[v];
+
+        if(max_uniLaplace < v_uniLaplace[v])
+            max_uniLaplace = v_uniLaplace[v];
+
+    }
     // ------------- IMPLEMENT HERE ---------
     // For each non-boundary vertex, compute uniform Laplacian operator vector
     // and store the vector length in the vertex property of the
@@ -288,6 +322,42 @@ void Viewer::calc_mean_curvature() {
     min_mean_curvature = 1000;
     max_mean_curvature = -1000;
 
+
+
+     for (auto v: mesh.vertices()){
+        
+        vh_c = mesh.halfedges(v);
+        
+        if(!vh_c) {
+            continue;
+        }
+
+        vh_end = vh_c;
+
+        const Point& refPoint = mesh.position(v);
+
+        int numVertices = 0;
+    
+        do {
+            numVertices ++;
+            neighbor_v = mesh.to_vertex(*vh_c);
+            e = mesh.edge(*vh_c);
+
+            const Point& vi = mesh.position(neighbor_v);
+            laplace += e_weight[e] * (refPoint - vi) ;
+        } while(++vh_c != vh_c);
+
+        laplace = laplace/numVertices;
+
+        v_curvature[v] = norm(laplace);
+
+        if(min_mean_curvature > v_curvature[v])
+            min_mean_curvature = v_curvature[v];
+
+        if(max_mean_curvature < v_curvature[v])
+            max_mean_curvature = v_curvature[v];
+
+    }
     // ------------- IMPLEMENT HERE ---------
     // For all non-boundary vertices, approximate the mean curvature using
     // the length of the Laplace-Beltrami approximation.
