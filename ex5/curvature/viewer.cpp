@@ -140,6 +140,7 @@ Normal Viewer::computeNormalOfFace(Mesh::Vertex_around_face_circulator fv_c){
 // ========================================================================
 void Viewer::computeNormalsWithConstantWeights() {
     Point default_normal(0.0, 1.0, 0.0);
+	Point base_point(0.0, 0.0, 0.0);
     Mesh::Vertex_property<Point> v_cste_weights_n =
             mesh.vertex_property<Point>("v:cste_weights_n", default_normal);
 
@@ -165,12 +166,12 @@ void Viewer::computeNormalsWithConstantWeights() {
 
         } while(++vf_c != vf_end);
 
-        Normal vertexNormal = default_normal;
+		Normal vertexNormal = base_point;
         for(auto n : face_normals){
             vertexNormal += n;
         }
 
-        v_cste_weights_n[v] = vertexNormal.normalize(); 
+        v_cste_weights_n[v] = vertexNormal.normalize();
        
     }
 
@@ -180,6 +181,7 @@ void Viewer::computeNormalsWithConstantWeights() {
 // ========================================================================
 void Viewer::computeNormalsByAreaWeights() {
     Point default_normal(0.0, 1.0, 0.0);
+	Point base_point(0.0, 0.0, 0.0);
     Mesh::Vertex_property<Point> v_area_weights_n =
             mesh.vertex_property<Point>("v:area_weight_n", default_normal);
 
@@ -205,7 +207,7 @@ void Viewer::computeNormalsByAreaWeights() {
 
         } while(++vf_c != vf_end);
 
-        Normal vertexNormal = default_normal;
+        Normal vertexNormal = base_point;
         
         for(auto n : face_normals_area){
             vertexNormal += (std::get<0>(n) * std::get<1>(n) );
@@ -219,6 +221,7 @@ void Viewer::computeNormalsByAreaWeights() {
 // ========================================================================
 void Viewer::computeNormalsWithAngleWeights() {
     Point default_normal(0.0, 1.0, 0.0);
+	Point base_point(0.0, 0.0, 0.0);
     Mesh::Vertex_property<Point> v_angle_weights_n =
             mesh.vertex_property<Point>("v:angle_weight_n", default_normal);
 
@@ -245,7 +248,7 @@ void Viewer::computeNormalsWithAngleWeights() {
 
         } while(++vf_c != vf_end);
 
-        Normal vertexNormal = default_normal;
+		Normal vertexNormal = base_point;
         for(auto n : face_normals_angle){
             vertexNormal += std::get<0>(n)*std::get<1>(n);
         }
