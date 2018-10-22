@@ -267,7 +267,7 @@ void Viewer::computeNormalsWithAngleWeights() {
 void Viewer::calc_uniform_laplacian() {
     Mesh::Vertex_property<Scalar> v_uniLaplace = mesh.vertex_property<Scalar>("v:uniLaplace", 0);
     Mesh::Vertex_around_vertex_circulator   vv_c, vv_end;
-    Point             laplace(0.0);
+    Point laplace(0.0);
     min_uniLaplace = 1000;
     max_uniLaplace = -1000;
 
@@ -338,19 +338,16 @@ void Viewer::calc_mean_curvature() {
         vh_end = vh_c;
 
         const Point& refPoint = mesh.position(v);
-
-        int numVertices = 0;
     
         do {
-            numVertices ++;
             neighbor_v = mesh.to_vertex(*vh_c);
             e = mesh.edge(*vh_c);
 
             const Point& vi = mesh.position(neighbor_v);
-            laplace += e_weight[e] * (refPoint - vi) ;
+            laplace += e_weight[e] * (refPoint - vi);
         } while(++vh_c != vh_c);
 
-        laplace = laplace/numVertices;
+        laplace = laplace/v_weight[v];
 
         v_curvature[v] = norm(laplace);
 
@@ -380,6 +377,47 @@ void Viewer::calc_gauss_curvature() {
     Scalar lb(-1.0f), ub(1.0f);
     min_gauss_curvature = 1000;
     max_gauss_curvature = -1000;
+
+	for (auto v : mesh.vertices()) {
+
+		vv_c = mesh.vertices(v);
+		vv_c2 = mesh.vertices(v);
+
+		if (!vv_c) {
+			continue;
+		}
+		if (!vv_c2) {
+			continue;
+		}
+
+		vv_end = vv_c;
+		++vv_c2;
+		cos_angle = 0.f;
+
+		const Point& refPoint = mesh.position(v);
+
+		do {
+			const Point& vi = mesh.position(*vv_c);
+			const Point& vi2 = mesh.position(*vv_c2);
+			d0 = norm(refPoint - vi);
+			d1 = norm(refPoint - vi2);
+			cos_angle += acos(min(ub, max(lb, dot(d0, d1))));
+
+			++vv_c;
+		} while (++vv_c2 != vv_end);
+
+		angles =  cos_angle;
+
+		v_gauss_curvature[v] = (2*M_PI - angles) / v_weight[v];
+
+		if (min_gauss_curvature > v_gauss_curvature[v])
+			min_gauss_curvature = v_gauss_curvature[v];
+
+		if (max_gauss_curvature < v_gauss_curvature[v])
+			max_gauss_curvature = v_gauss_curvature[v];
+
+	}
+
 
     // ------------- IMPLEMENT HERE ---------
     // For each non-boundary vertex, approximate Gaussian curvature,
