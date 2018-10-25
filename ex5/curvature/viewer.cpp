@@ -290,7 +290,7 @@ void Viewer::calc_uniform_laplacian() {
         do {
             ++ numVertices;
             const Point& vi = mesh.position(*vv_c);
-            laplace += refPoint - vi ;
+            laplace += vi-refPoint ;
         } while(++vv_c != vv_end);
 
         laplace = laplace/numVertices;
@@ -326,9 +326,10 @@ void Viewer::calc_mean_curvature() {
     max_mean_curvature = -1000;
 
 
-
-     for (auto v: mesh.vertices()){
+    for (auto v: mesh.vertices()){
         
+        laplace = Point(0.0f);
+
         vh_c = mesh.halfedges(v);
         
         if(!vh_c) {
@@ -344,10 +345,11 @@ void Viewer::calc_mean_curvature() {
             e = mesh.edge(*vh_c);
 
             const Point& vi = mesh.position(neighbor_v);
-            laplace += e_weight[e] * (refPoint - vi);
-        } while(++vh_c != vh_c);
+            laplace += e_weight[e]* 2.0f * (vi-refPoint);
 
-        laplace = laplace/v_weight[v];
+        } while(++vh_c != vh_end);
+
+        laplace = laplace * v_weight[v];
 
         v_curvature[v] = norm(laplace);
 
@@ -378,45 +380,70 @@ void Viewer::calc_gauss_curvature() {
     min_gauss_curvature = 1000;
     max_gauss_curvature = -1000;
 
-	for (auto v : mesh.vertices()) {
+    Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
+    Mesh::Vertex neighbor_v_before,neighbor_v_after;
 
-		vv_c = mesh.vertices(v);
-		vv_c2 = mesh.vertices(v);
+    Mesh::Halfedge halfedge_before,halfedge_after;
 
-		if (!vv_c) {
-			continue;
-		}
-		if (!vv_c2) {
-			continue;
-		}
+    Point neighbor_p_before,neighbor_p_after;
 
-		vv_end = vv_c;
-		++vv_c2;
-		cos_angle = 0.f;
+	for (auto v: mesh.vertices()){
 
-		const Point& refPoint = mesh.position(v);
 
-		do {
-			const Point& vi = mesh.position(*vv_c);
-			const Point& vi2 = mesh.position(*vv_c2);
-			d0 = norm(refPoint - vi);
-			d1 = norm(refPoint - vi2);
-			cos_angle += acos(min(ub, max(lb, dot(d0, d1))));
+        vh_c = mesh.halfedges(v);
+        
+        if(!vh_c) {
+            continue;
+        }
 
-			++vv_c;
-		} while (++vv_c2 != vv_end);
+        vh_end = vh_c;
 
-		angles =  cos_angle;
+        const Point& refPoint = mesh.position(v);
+        halfedge_before = *vh_c;
+        neighbor_v_before = mesh.to_vertex(*vh_c);
 
-		v_gauss_curvature[v] = (2*M_PI - angles) / v_weight[v];
+        ++vh_c; // prepare nextHalfedge
 
-		if (min_gauss_curvature > v_gauss_curvature[v])
-			min_gauss_curvature = v_gauss_curvature[v];
+        Scalar theta = 0.0f;
+    
+        do {
+            neighbor_v_after = mesh.to_vertex(*vh_c);
 
-		if (max_gauss_curvature < v_gauss_curvature[v])
-			max_gauss_curvature = v_gauss_curvature[v];
+            neighbor_p_before = mesh.position(neighbor_v_before);
+            neighbor_p_after = mesh.position(neighbor_v_after);
+            
+            Point d0 = normalize(neighbor_p_before - refPoint);
+            Point d1 = normalize(neighbor_p_after - refPoint);
 
-	}
+            theta += acos(min(0.99f, max(-0.99f, dot(d0, d1)))) ;
+
+            neighbor_v_before = neighbor_v_after;
+            halfedge_before = halfedge_after;
+
+
+        } while(++vh_c != vh_end);
+
+
+        neighbor_v_after = mesh.to_vertex(*vh_c);
+
+        neighbor_p_before = mesh.position(neighbor_v_before);
+        neighbor_p_after = mesh.position(neighbor_v_after);
+        
+        Point d0 = normalize(neighbor_p_before - refPoint);
+        Point d1 = normalize(neighbor_p_after - refPoint);
+
+        theta += acos(min(0.99f, max(-0.99f, dot(d0, d1)))) ;
+
+
+        v_gauss_curvature[v] = (2*M_PI - theta) * 2.0f * v_weight[v];
+
+        if(min_mean_curvature > v_gauss_curvature[v])
+            min_mean_curvature = v_gauss_curvature[v];
+
+        if(max_mean_curvature < v_gauss_curvature[v])
+            max_mean_curvature = v_gauss_curvature[v];
+
+    }
 
 
     // ------------- IMPLEMENT HERE ---------
