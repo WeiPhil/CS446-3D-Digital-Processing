@@ -210,12 +210,54 @@ void MeshProcessing::implicit_smoothing(const double timestep) {
     // nonzero elements of A as triplets: (row, column, value)
     std::vector< Eigen::Triplet<double> > triplets;
 
+    Scalar diffusion = 1.37f/(M_PI*M_PI);
+    Scalar delta_t_lambda = timestep * diffusion;
+
+    // Calculate D then D^-1 
+    // Calculate M
+    for (auto v: mesh_.vertices()){
+
+        // Right part
+        Scalar area = 1.0f/area_inv[v];
+
+        B(v.idx(),0) = area * points[v].x;
+        B(v.idx(),1) = area * points[v].y;
+        B(v.idx(),2) = area * points[v].z;
+
+        // Left part
+
+        Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
+        Mesh::Vertex neighbor_v;
+        Mesh::Edge e;
+
+        Scalar total_cotan_weight = 0.0f;
+
+        vh_c = mesh_.halfedges(v);
+
+        vh_end = vh_c;
+
+        do {
+            neighbor_v = mesh_.to_vertex(*vh_c);
+            e = mesh_.edge(*vh_c);
+
+            total_cotan_weight += cotan[e];
+            
+            triplets.push_back(Eigen::Triplet<double>(v.idx(),neighbor_v.idx(),- delta_t_lambda * cotan[e]));
+
+        } while(++vh_c != vh_end);
+
+        triplets.push_back(Eigen::Triplet<double>(v.idx(),v.idx(),area+ delta_t_lambda * total_cotan_weight));
+
+        
+    }
+    
     // ========================================================================
     // TODO: IMPLEMENTATION FOR EXERCISE 2 HERE
     // ========================================================================
 
     // build sparse matrix from triplets
     A.setFromTriplets(triplets.begin(), triplets.end());
+
 
     // solve A*X = B
     Eigen::SimplicialLDLT< Eigen::SparseMatrix<double> > solver(A);
@@ -246,6 +288,27 @@ void MeshProcessing::uniform_laplacian_enhance_feature(const unsigned int iterat
     // 2) update the vertex positions according to the difference between the original and the smoothed mesh,
     //    using enhancement_coef as the value of alpha in the feature enhancement formula
     // ------------- IMPLEMENT HERE ---------
+    Eigen::MatrixXf pin = *get_points();
+
+    uniform_smooth(iterations);
+
+    Eigen::MatrixXf pout = *get_points();
+
+    int n = mesh_.n_vertices();
+
+    Eigen::MatrixXf pStar(n,3);
+
+    auto points = mesh_.vertex_property<Point>("v:point");
+
+    for(int i = 0 ; i <  n ; i ++){
+        
+        Mesh::Vertex v(i);
+        for (int dim = 0; dim < 3; ++dim)
+            points[v][dim] = pout.coeff(i,dim) + coefficient*(pin.coeff(i,dim) - pout.coeff(i,dim));
+
+    }
+
+
 }
 
 // ======================================================================
@@ -399,6 +462,8 @@ void MeshProcessing::calc_gauss_curvature() {
 
     Point neighbor_p_before,neighbor_p_after;
 
+    bool hasBoundaryEdge = false;
+
 	for (auto v: mesh_.vertices()){
 
 
@@ -417,8 +482,14 @@ void MeshProcessing::calc_gauss_curvature() {
         ++vh_c; // prepare nextHalfedge
 
         Scalar theta = 0.0f;
+
     
         do {
+
+            if(mesh_.is_boundary(halfedge_before)){ // we should return 0 if it's a point on the edge of the model
+                hasBoundaryEdge = true;
+            }
+
             neighbor_v_after = mesh_.to_vertex(*vh_c);
 
             neighbor_p_before = mesh_.position(neighbor_v_before);
@@ -432,9 +503,13 @@ void MeshProcessing::calc_gauss_curvature() {
             neighbor_v_before = neighbor_v_after;
             halfedge_before = halfedge_after;
 
-
         } while(++vh_c != vh_end);
 
+        if(hasBoundaryEdge){
+            v_gauss_curvature[v] = 0.0f;
+            hasBoundaryEdge = false;
+            continue;
+        }
 
         neighbor_v_after = mesh_.to_vertex(*vh_c);
 
