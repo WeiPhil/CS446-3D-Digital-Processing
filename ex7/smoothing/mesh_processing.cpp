@@ -288,27 +288,37 @@ void MeshProcessing::uniform_laplacian_enhance_feature(const unsigned int iterat
     // 2) update the vertex positions according to the difference between the original and the smoothed mesh,
     //    using enhancement_coef as the value of alpha in the feature enhancement formula
     // ------------- IMPLEMENT HERE ---------
-    Eigen::MatrixXf pin = *get_points();
+
+    Mesh::Vertex_property<Point> points_in = mesh_.add_vertex_property<Point>("points_in");
+    Mesh::Vertex_property<Point> points_out = mesh_.add_vertex_property<Point>("points_out");
+
+    for(auto v : mesh_.vertices()){
+        points_in[v] = mesh_.position(v);
+
+    }
 
     uniform_smooth(iterations);
+
+    for(auto v : mesh_.vertices()){
+        points_out[v] = mesh_.position(v);
+
+    }
 
     Eigen::MatrixXf pout = *get_points();
 
     int n = mesh_.n_vertices();
 
-    Eigen::MatrixXf pStar(n,3);
-
     auto points = mesh_.vertex_property<Point>("v:point");
 
-    for(int i = 0 ; i <  n ; i ++){
-        
-        Mesh::Vertex v(i);
+    for(auto v : mesh_.vertices()){ 
         for (int dim = 0; dim < 3; ++dim)
-            points[v][dim] = pout.coeff(i,dim) + coefficient*(pin.coeff(i,dim) - pout.coeff(i,dim));
+            points[v][dim] = points_in[v][dim] + coefficient * (points_in[v][dim] - points_out[v][dim]);
 
     }
 
-
+    mesh_.remove_vertex_property(points_in);
+    mesh_.remove_vertex_property(points_out);
+    
 }
 
 // ======================================================================
@@ -323,6 +333,35 @@ void MeshProcessing::cotan_laplacian_enhance_feature(const unsigned int iteratio
     // 2) update the vertex positions according to the difference between the original and the smoothed mesh,
     //    using enhancement_coef as the value of alpha in the feature enhancement formula
     // ------------- IMPLEMENT HERE ---------
+    Mesh::Vertex_property<Point> points_in = mesh_.add_vertex_property<Point>("points_in");
+    Mesh::Vertex_property<Point> points_out = mesh_.add_vertex_property<Point>("points_out");
+
+    for(auto v : mesh_.vertices()){
+        points_in[v] = mesh_.position(v);
+
+    }
+
+    smooth(iterations);
+
+    for(auto v : mesh_.vertices()){
+        points_out[v] = mesh_.position(v);
+
+    }
+
+    int n = mesh_.n_vertices();
+
+    auto points = mesh_.vertex_property<Point>("v:point");
+
+    for(auto v : mesh_.vertices()){
+        for (int dim = 0; dim < 3; ++dim)
+            points[v][dim] = points_in[v][dim] + coefficient * (points_in[v][dim] - points_out[v][dim]);
+
+    }
+
+    mesh_.remove_vertex_property(points_in);
+    mesh_.remove_vertex_property(points_out);
+
+
 }
 
 void MeshProcessing::calc_weights() {
