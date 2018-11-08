@@ -28,7 +28,7 @@ MeshProcessing::MeshProcessing(const string& filename) {
     load_mesh(filename);
 }
 
-Point MeshProcessing::calclateUniformDiscreteLaplacian(Mesh::Vertex v){
+Point MeshProcessing::calculateUniformDiscreteLaplacian(Mesh::Vertex v){
 
     // Initialize variables
     Point acc_laplace = Point(0.0f);
