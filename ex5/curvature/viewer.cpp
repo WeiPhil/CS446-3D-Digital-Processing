@@ -106,6 +106,12 @@ void Viewer::computeValence() {
     }
 }
 
+/*  @brief   Computes a face's normal and area
+
+    @param  fv_c    A face's circulator
+
+    @return A tuple containing the face's normal and area
+*/
 std::tuple<Normal,Scalar> Viewer::computeNormalOfFaceAndArea(Mesh::Vertex_around_face_circulator fv_c){
 
     const Point& xi = mesh.position(*fv_c);  ++fv_c;
@@ -118,6 +124,12 @@ std::tuple<Normal,Scalar> Viewer::computeNormalOfFaceAndArea(Mesh::Vertex_around
     return std::make_tuple(crossProduct.normalize(), area);
 }
 
+/*  @brief   Computes a face's normal
+
+    @param  fv_c    A face's circulator
+
+    @return A tuple containing the face's normal and angle
+*/
 std::tuple<Normal,Scalar> Viewer::computeNormalOfFaceAndAngle(Mesh::Vertex_around_face_circulator fv_c){
 
     const Point& xi = mesh.position(*fv_c);  ++fv_c;
@@ -127,6 +139,12 @@ std::tuple<Normal,Scalar> Viewer::computeNormalOfFaceAndAngle(Mesh::Vertex_aroun
     return std::make_tuple(cross(xj-xi,xk-xi).normalize(), std::acos(dot((xj-xi).normalize(), (xk-xi).normalize()) ) );
 }
 
+/*  @brief   Computes a face's normal
+
+    @param  fv_c    A face's circulator
+
+    @return A face's normal
+*/
 Normal Viewer::computeNormalOfFace(Mesh::Vertex_around_face_circulator fv_c){
 
     const Point& xi = mesh.position(*fv_c);  ++fv_c;
@@ -135,42 +153,36 @@ Normal Viewer::computeNormalOfFace(Mesh::Vertex_around_face_circulator fv_c){
 
     return cross(xj-xi,xk-xi).normalize();
 }
+
 // ========================================================================
 // EXERCISE 1.1
 // ========================================================================
 void Viewer::computeNormalsWithConstantWeights() {
     Point default_normal(0.0, 1.0, 0.0);
-	Point base_point(0.0, 0.0, 0.0);
     Mesh::Vertex_property<Point> v_cste_weights_n =
             mesh.vertex_property<Point>("v:cste_weights_n", default_normal);
 
     Mesh::Vertex_around_face_circulator fv_c;
     Mesh::Face_around_vertex_circulator vf_c, vf_end;
 
+    // Iterate over vertices
     for (auto v: mesh.vertices()){
         
         vf_c = mesh.faces(v);
-        
         if(!vf_c) {
             continue;
         }
 
         vf_end = vf_c;
+		Normal vertexNormal(0.0, 0.0, 0.0);
 
-        std::vector<Normal> face_normals;
-
+        // Iterate over adjacent faces
         do {
             fv_c = mesh.vertices(*vf_c);
-
-            face_normals.push_back(computeNormalOfFace(fv_c));
-
+            vertexNormal += computeNormalOfFace(fv_c);
         } while(++vf_c != vf_end);
 
-		Normal vertexNormal = base_point;
-        for(auto n : face_normals){
-            vertexNormal += n;
-        }
-
+        // Normalize
         v_cste_weights_n[v] = vertexNormal.normalize();
        
     }
@@ -181,37 +193,32 @@ void Viewer::computeNormalsWithConstantWeights() {
 // ========================================================================
 void Viewer::computeNormalsByAreaWeights() {
     Point default_normal(0.0, 1.0, 0.0);
-	Point base_point(0.0, 0.0, 0.0);
     Mesh::Vertex_property<Point> v_area_weights_n =
             mesh.vertex_property<Point>("v:area_weight_n", default_normal);
 
     Mesh::Vertex_around_face_circulator fv_c;
     Mesh::Face_around_vertex_circulator vf_c, vf_end;
 
+    // Iterate over vertices
     for (auto v: mesh.vertices()){
         
         vf_c = mesh.faces(v);
-        
         if(!vf_c) {
             continue;
         }
 
         vf_end = vf_c;
+        Normal vertexNormal(0.0, 0.0, 0.0);
 
-        std::vector<std::tuple<Normal,Scalar>> face_normals_area;
-
+        // Iterate over adjacent faces
         do {
             fv_c = mesh.vertices(*vf_c);
-
-            face_normals_area.push_back(computeNormalOfFaceAndArea(fv_c));
-
+            std::tuple<Normal,Scalar> n = computeNormalOfFaceAndArea(fv_c);
+            vertexNormal += (std::get<0>(n) * std::get<1>(n) );
         } while(++vf_c != vf_end);
 
-        Normal vertexNormal = base_point;
         
-        for(auto n : face_normals_area){
-            vertexNormal += (std::get<0>(n) * std::get<1>(n) );
-        }
+        // Normalize
         v_area_weights_n[v] = vertexNormal.normalize(); 
        
     }
@@ -228,88 +235,72 @@ void Viewer::computeNormalsWithAngleWeights() {
     Mesh::Vertex_around_face_circulator fv_c;
     Mesh::Face_around_vertex_circulator vf_c, vf_end;
 
+    // Iterate over vertices
     for (auto v: mesh.vertices()){
         
         vf_c = mesh.faces(v);
         
         if(!vf_c) {
-            cout << "No faces?" << endl;
             continue;
         }
 
         vf_end = vf_c;
-
-        std::vector<std::tuple<Normal,Scalar>> face_normals_angle;
-
+        Normal vertexNormal(0.0, 0.0, 0.0);
+    
+        // Iterate over adjacent faces
         do {
             fv_c = mesh.vertices(*vf_c);
-
-            face_normals_angle.push_back(computeNormalOfFaceAndAngle(fv_c));
-
+            std::tuple<Normal,Scalar> n = computeNormalOfFaceAndAngle(fv_c);
+            vertexNormal += std::get<0>(n)*std::get<1>(n);
         } while(++vf_c != vf_end);
 
-		Normal vertexNormal = base_point;
-        for(auto n : face_normals_angle){
-            vertexNormal += std::get<0>(n)*std::get<1>(n);
-        }
-
+        // Normalize
         v_angle_weights_n[v] = vertexNormal.normalize(); 
        
     }
-    // ------------- IMPLEMENT HERE ---------
-    // Compute the normals for each vertex v in the mesh using the weights proportionals
-    // to the angles technique (see .pdf) and store it inside v_angle_weights_n[v]
-    // ------------- IMPLEMENT HERE ---------
 }
 // ========================================================================
 // EXERCISE 2.1
 // ========================================================================
 void Viewer::calc_uniform_laplacian() {
     Mesh::Vertex_property<Scalar> v_uniLaplace = mesh.vertex_property<Scalar>("v:uniLaplace", 0);
-    Mesh::Vertex_around_vertex_circulator   vv_c, vv_end;
-    Point laplace(0.0);
+    Mesh::Vertex_around_vertex_circulator vv_c, vv_end;
     min_uniLaplace = 1000;
     max_uniLaplace = -1000;
 
-    // Need to test if a vertex is a boundary vertex, if it is not we can calculate the uniform laplacian
-
+    // Iterate over vertices
     for (auto v: mesh.vertices()){
         
+        // Initialize variables
+        Point acc_laplace(0.0);
         vv_c = mesh.vertices(v);
-        
         if(!vv_c) {
             continue;
         }
-
         vv_end = vv_c;
-
         const Point& refPoint = mesh.position(v);
-
         int numVertices = 0;
-    
+
+        // Iterate over adjacent vertices    
         do {
             ++ numVertices;
             const Point& vi = mesh.position(*vv_c);
-            laplace += vi-refPoint ;
+            acc_laplace += vi-refPoint ;
         } while(++vv_c != vv_end);
 
-        laplace = laplace/numVertices;
+        // Average and normalize the Laplacian
+        acc_laplace /= numVertices;
+        v_uniLaplace[v] = norm(acc_laplace);
 
-        v_uniLaplace[v] = norm(laplace);
-
-        if(min_uniLaplace > v_uniLaplace[v])
+        // Update the minimum and maximum
+        if(min_uniLaplace > v_uniLaplace[v]) {
             min_uniLaplace = v_uniLaplace[v];
-
-        if(max_uniLaplace < v_uniLaplace[v])
+        }
+        if(max_uniLaplace < v_uniLaplace[v]) {
             max_uniLaplace = v_uniLaplace[v];
+        }
 
     }
-    // ------------- IMPLEMENT HERE ---------
-    // For each non-boundary vertex, compute uniform Laplacian operator vector
-    // and store the vector length in the vertex property of the
-    // mesh called v_uniLaplace[v].
-    // Store min and max values of v_uniLaplace[v] in min_uniLaplace and max_uniLaplace.
-    // ------------- IMPLEMENT HERE ---------
 }
 // ========================================================================
 // EXERCISE 2.2
@@ -319,53 +310,42 @@ void Viewer::calc_mean_curvature() {
     Mesh::Edge_property<Scalar> e_weight = mesh.edge_property<Scalar>("e:weight", 0);
     Mesh::Vertex_property<Scalar>  v_weight = mesh.vertex_property<Scalar>("v:weight", 0);
     Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
-    Mesh::Vertex neighbor_v;
-    Mesh::Edge e;
-    Point laplace(0.0);
     min_mean_curvature = 1000;
     max_mean_curvature = -1000;
 
-
+    // Iterate over vertices
     for (auto v: mesh.vertices()){
         
-        laplace = Point(0.0f);
-
+        // Initialize variables
+        Point acc_laplace(0.0);
         vh_c = mesh.halfedges(v);
-        
         if(!vh_c) {
             continue;
         }
-
         vh_end = vh_c;
-
         const Point& refPoint = mesh.position(v);
     
+        // Iterate over adjacent vertices
         do {
-            neighbor_v = mesh.to_vertex(*vh_c);
-            e = mesh.edge(*vh_c);
-
+            Mesh::Vertex neighbor_v = mesh.to_vertex(*vh_c);
+            Mesh::Edge e = mesh.edge(*vh_c);
             const Point& vi = mesh.position(neighbor_v);
-            laplace += e_weight[e]* 2.0f * (vi-refPoint);
+            acc_laplace += e_weight[e] * 2.0f * (vi-refPoint);
 
         } while(++vh_c != vh_end);
 
-        laplace = laplace * v_weight[v];
+        // Multiply by vertex's weight and normalize
+        acc_laplace *= v_weight[v];
+        v_curvature[v] = norm(acc_laplace);
 
-        v_curvature[v] = norm(laplace);
-
-        if(min_mean_curvature > v_curvature[v])
+        // Update the minimum and maximum
+        if(min_mean_curvature > v_curvature[v]) {
             min_mean_curvature = v_curvature[v];
-
-        if(max_mean_curvature < v_curvature[v])
+        }
+        if(max_mean_curvature < v_curvature[v]) {
             max_mean_curvature = v_curvature[v];
-
+        }
     }
-    // ------------- IMPLEMENT HERE ---------
-    // For all non-boundary vertices, approximate the mean curvature using
-    // the length of the Laplace-Beltrami approximation.
-    // Save your approximation in v_curvature vertex property of the mesh.
-    // Use the weights from calc_weights(): e_weight and v_weight
-    // ------------- IMPLEMENT HERE ---------
 }
 // ========================================================================
 // EXERCISE 2.3
@@ -373,84 +353,59 @@ void Viewer::calc_mean_curvature() {
 void Viewer::calc_gauss_curvature() {
     Mesh::Vertex_property<Scalar> v_gauss_curvature = mesh.vertex_property<Scalar>("v:gauss_curvature", 0);
     Mesh::Vertex_property<Scalar> v_weight = mesh.vertex_property<Scalar>("v:weight", 0);
-    Mesh::Vertex_around_vertex_circulator vv_c, vv_c2, vv_end;
-    Point d0, d1;
-    Scalar angles, cos_angle;
-    Scalar lb(-1.0f), ub(1.0f);
+    Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
     min_gauss_curvature = 1000;
     max_gauss_curvature = -1000;
 
-    Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
-    Mesh::Vertex neighbor_v_before,neighbor_v_after;
-
-    Mesh::Halfedge halfedge_before,halfedge_after;
-
-    Point neighbor_p_before,neighbor_p_after;
-
+    // Iterate over vertices
 	for (auto v: mesh.vertices()){
 
-
+        // Initialize variables
         vh_c = mesh.halfedges(v);
-        
         if(!vh_c) {
             continue;
         }
-
         vh_end = vh_c;
-
         const Point& refPoint = mesh.position(v);
-        halfedge_before = *vh_c;
-        neighbor_v_before = mesh.to_vertex(*vh_c);
-
-        ++vh_c; // prepare nextHalfedge
-
-        Scalar theta = 0.0f;
-    
+        Scalar theta = 0.f;
+       
+        // Get the first vertex
+        Point neighbor_p_before = mesh.position(mesh.to_vertex(*vh_c));
+        ++vh_c;
+     
+        // Iterate over adjacent vertices
         do {
-            neighbor_v_after = mesh.to_vertex(*vh_c);
 
-            neighbor_p_before = mesh.position(neighbor_v_before);
-            neighbor_p_after = mesh.position(neighbor_v_after);
+            // Get next vertex
+            Point neighbor_p_after = mesh.position(mesh.to_vertex(*vh_c));
             
+            // Normalize the two triange edges
             Point d0 = normalize(neighbor_p_before - refPoint);
             Point d1 = normalize(neighbor_p_after - refPoint);
 
+            // Accumulate the angle
             theta += acos(min(0.99f, max(-0.99f, dot(d0, d1)))) ;
 
-            neighbor_v_before = neighbor_v_after;
-            halfedge_before = halfedge_after;
-
+            // The "after" vertex become the "before" vertex
+            neighbor_p_before = neighbor_p_after;
 
         } while(++vh_c != vh_end);
 
-
-        neighbor_v_after = mesh.to_vertex(*vh_c);
-
-        neighbor_p_before = mesh.position(neighbor_v_before);
-        neighbor_p_after = mesh.position(neighbor_v_after);
-        
+        // Get last angle
+        Point neighbor_p_after = mesh.position(mesh.to_vertex(*vh_c));
         Point d0 = normalize(neighbor_p_before - refPoint);
         Point d1 = normalize(neighbor_p_after - refPoint);
-
         theta += acos(min(0.99f, max(-0.99f, dot(d0, d1)))) ;
 
-
+        // Normalize
         v_gauss_curvature[v] = (2*M_PI - theta) * 2.0f * v_weight[v];
 
-        if(min_mean_curvature > v_gauss_curvature[v])
+        // Update the minimum and maximum
+        if(min_mean_curvature > v_gauss_curvature[v]) {
             min_mean_curvature = v_gauss_curvature[v];
-
-        if(max_mean_curvature < v_gauss_curvature[v])
+        }
+        if(max_mean_curvature < v_gauss_curvature[v]) {
             max_mean_curvature = v_gauss_curvature[v];
-
+        }
     }
-
-
-    // ------------- IMPLEMENT HERE ---------
-    // For each non-boundary vertex, approximate Gaussian curvature,
-    // and store it in the vertex property v_gauss_curvature.
-    // Hint: When calculating angles out of cross products make sure the value
-    // you pass to the acos function is between -1.0 and 1.0.
-    // Use the v_weight property for the area weight.
-    // ------------- IMPLEMENT HERE ---------
 }

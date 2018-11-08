@@ -370,199 +370,158 @@ void MeshProcessing::calc_weights() {
 }
 
 void MeshProcessing::calc_uniform_mean_curvature() {
-    Mesh::Vertex_property<Scalar> v_unicurvature =
-            mesh_.vertex_property<Scalar>("v:unicurvature", 0.0f);
-    // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
 
-    Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
-    Mesh::Vertex neighbor_v;
-    Mesh::Edge e;
-    Point laplace(0.0);
+    Mesh::Vertex_property<Scalar> v_unicurvature = mesh_.vertex_property<Scalar>("v:unicurvature", 0.0f);
 
-    bool hasBoundaryEdge = false;
-
+    // Iterate over vertices
     for (auto v: mesh_.vertices()){
         
-        laplace = Point(0.0f);
-
-        vh_c = mesh_.halfedges(v);
-        
+        // Initialize variables
+        Point acc_laplace = Point(0.0f);
+        Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
         if(!vh_c) {
             continue;
         }
-
-        vh_end = vh_c;
-
+        Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
         const Point& refPoint = mesh_.position(v);
-
         int num_vertices = 0;
+        bool hasBoundaryEdge = false;
     
         do {
+            // Increment number of vertices
             num_vertices ++;
             
-            neighbor_v = mesh_.to_vertex(*vh_c);
-            e = mesh_.edge(*vh_c);
+            Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
+            Mesh::Edge e = mesh_.edge(*vh_c);
 
-            if(mesh_.is_boundary(e)){ // we should return 0 if it's a point on the edge of the model
+            // Check for boundary
+            if(mesh_.is_boundary(e)){ 
                 hasBoundaryEdge = true;
+                break;
             }
 
             const Point& vi = mesh_.position(neighbor_v);
-            laplace += (vi-refPoint);
+            acc_laplace += (vi-refPoint);
 
         } while(++vh_c != vh_end);
 
         if(hasBoundaryEdge){
+            // Curvature is 0 on boundary
             v_unicurvature[v] = 0.0f;
-            hasBoundaryEdge = false;
-            continue;
+        } else {
+            // Multiply by vertex's weight and normalize
+            acc_laplace = acc_laplace/num_vertices;
+            v_unicurvature[v] = norm(acc_laplace);
         }
-
-        laplace = laplace/num_vertices;
-
-        v_unicurvature[v] = norm(laplace);
 
     }
 }
 
 void MeshProcessing::calc_mean_curvature() {
-    Mesh::Vertex_property<Scalar>  v_curvature =
-            mesh_.vertex_property<Scalar>("v:curvature", 0.0f);
-    Mesh::Edge_property<Scalar> e_weight =
-            mesh_.edge_property<Scalar>("e:weight", 0.0f);
-    Mesh::Vertex_property<Scalar>  v_weight =
-            mesh_.vertex_property<Scalar>("v:weight", 0.0f);
-
     
-    // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
-    Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
-    Mesh::Vertex neighbor_v;
-    Mesh::Edge e;
-    Point laplace(0.0);
+    Mesh::Vertex_property<Scalar>  v_curvature = mesh_.vertex_property<Scalar>("v:curvature", 0);
+    Mesh::Edge_property<Scalar> e_weight = mesh_.edge_property<Scalar>("e:weight", 0);
+    Mesh::Vertex_property<Scalar>  v_weight = mesh_.vertex_property<Scalar>("v:weight", 0);
 
-    bool hasBoundaryEdge = false;
-
+    // Iterate over vertices
     for (auto v: mesh_.vertices()){
         
-        laplace = Point(0.0f);
-
-        vh_c = mesh_.halfedges(v);
-        
+        // Initialize variables
+        Point acc_laplace(0.0);
+        Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
         if(!vh_c) {
             continue;
         }
-
-        vh_end = vh_c;
-
+        Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
         const Point& refPoint = mesh_.position(v);
-    
-        do {
-            neighbor_v = mesh_.to_vertex(*vh_c);
-            e = mesh_.edge(*vh_c);
+        bool hasBoundaryEdge = false;
 
-            if(mesh_.is_boundary(e)){ // we should return 0 if it's a point on the edge of the model
+        // Iterate over adjacent vertices
+        do {
+            Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
+            Mesh::Edge e = mesh_.edge(*vh_c);
+
+            // Check for boundary
+            if(mesh_.is_boundary(e)){ 
                 hasBoundaryEdge = true;
+                break;
             }
 
             const Point& vi = mesh_.position(neighbor_v);
-            laplace += e_weight[e] * (vi-refPoint);
+            acc_laplace += e_weight[e] * 2.0f * (vi-refPoint);
 
         } while(++vh_c != vh_end);
 
         if(hasBoundaryEdge){
+            // Curvature is 0 on boundary
             v_curvature[v] = 0.0f;
-            hasBoundaryEdge = false;
-            continue;
+        } else {
+            // Multiply by vertex's weight and normalize
+            acc_laplace *= v_weight[v];
+            v_curvature[v] = norm(acc_laplace);
         }
-
-        laplace = laplace * v_weight[v];
-
-        v_curvature[v] = norm(laplace);
-
     }
 }
 
 void MeshProcessing::calc_gauss_curvature() {
-    Mesh::Vertex_property<Scalar> v_gauss_curvature =
-            mesh_.vertex_property<Scalar>("v:gauss_curvature", 0.0f);
-    Mesh::Vertex_property<Scalar> v_weight =
-            mesh_.vertex_property<Scalar>("v:weight", 0.0f);
-    // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
+    
+    Mesh::Vertex_property<Scalar> v_gauss_curvature = mesh_.vertex_property<Scalar>("v:gauss_curvature", 0);
+    Mesh::Vertex_property<Scalar> v_weight = mesh_.vertex_property<Scalar>("v:weight", 0);
 
-    Mesh::Vertex_around_vertex_circulator vv_c, vv_c2, vv_end;
-    Point d0, d1;
-    Scalar angles, cos_angle;
-    Scalar lb(-1.0f), ub(1.0f);
-
-    Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
-    Mesh::Vertex neighbor_v_before,neighbor_v_after;
-
-    Mesh::Halfedge halfedge_before,halfedge_after;
-
-    Point neighbor_p_before,neighbor_p_after;
-
-    bool hasBoundaryEdge = false;
-
+    // Iterate over vertices
 	for (auto v: mesh_.vertices()){
 
-
-        vh_c = mesh_.halfedges(v);
-        
+        // Initialize variables
+        Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
         if(!vh_c) {
             continue;
         }
-
-        vh_end = vh_c;
-
+        Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
         const Point& refPoint = mesh_.position(v);
-        halfedge_before = *vh_c;
-        neighbor_v_before = mesh_.to_vertex(*vh_c);
-
-        ++vh_c; // prepare nextHalfedge
-
-        Scalar theta = 0.0f;
-
-    
+        Scalar theta = 0.f;
+        bool hasBoundaryEdge = false;
+       
+        // Get the first vertex
+        Point neighbor_p_before = mesh_.position(mesh_.to_vertex(*vh_c));
+        ++vh_c;
+     
+        // Iterate over adjacent vertices
         do {
 
-            if(mesh_.is_boundary(halfedge_before)){ // we should return 0 if it's a point on the edge of the model
+            // Check for boundary
+            if(mesh_.is_boundary(*vh_c)){
                 hasBoundaryEdge = true;
+                break;
             }
 
-            neighbor_v_after = mesh_.to_vertex(*vh_c);
-
-            neighbor_p_before = mesh_.position(neighbor_v_before);
-            neighbor_p_after = mesh_.position(neighbor_v_after);
+            // Get next vertex
+            Point neighbor_p_after = mesh_.position(mesh_.to_vertex(*vh_c));
             
+            // Normalize the two triange edges
             Point d0 = normalize(neighbor_p_before - refPoint);
             Point d1 = normalize(neighbor_p_after - refPoint);
 
+            // Accumulate the angle
             theta += acos(min(0.99f, max(-0.99f, dot(d0, d1)))) ;
 
-            neighbor_v_before = neighbor_v_after;
-            halfedge_before = halfedge_after;
+            // The "after" vertex become the "before" vertex
+            neighbor_p_before = neighbor_p_after;
 
         } while(++vh_c != vh_end);
 
         if(hasBoundaryEdge){
+            // Curvature is 0 on boundary
             v_gauss_curvature[v] = 0.0f;
-            hasBoundaryEdge = false;
-            continue;
+        } else {
+            // Get last angle
+            Point neighbor_p_after = mesh_.position(mesh_.to_vertex(*vh_c));
+            Point d0 = normalize(neighbor_p_before - refPoint);
+            Point d1 = normalize(neighbor_p_after - refPoint);
+            theta += acos(min(0.99f, max(-0.99f, dot(d0, d1)))) ;
+
+            // Normalize
+            v_gauss_curvature[v] = (2*M_PI - theta) * 2.0f * v_weight[v];
         }
-
-        neighbor_v_after = mesh_.to_vertex(*vh_c);
-
-        neighbor_p_before = mesh_.position(neighbor_v_before);
-        neighbor_p_after = mesh_.position(neighbor_v_after);
-        
-        Point d0 = normalize(neighbor_p_before - refPoint);
-        Point d1 = normalize(neighbor_p_after - refPoint);
-
-        theta += acos(min(0.99f, max(-0.99f, dot(d0, d1)))) ;
-
-
-        v_gauss_curvature[v] = (2*M_PI - theta) * 2.0f * v_weight[v];
-
     }
 }
 
@@ -779,8 +738,7 @@ void MeshProcessing::color_coding(Mesh::Vertex_property<Scalar> prop, Mesh *mesh
 }
 
 void MeshProcessing::set_color(Mesh::Vertex v, const Color& col,
-               Mesh::Vertex_property<Color> color_prop)
-{
+               Mesh::Vertex_property<Color> color_prop) {
     color_prop[v] = col;
 }
 
