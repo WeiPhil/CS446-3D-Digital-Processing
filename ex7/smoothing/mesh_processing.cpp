@@ -28,103 +28,88 @@ MeshProcessing::MeshProcessing(const string& filename) {
     load_mesh(filename);
 }
 
-Point MeshProcessing::caluculateUniformDiscreteLaplacian(Mesh::Vertex v){
+Point MeshProcessing::calclateUniformDiscreteLaplacian(Mesh::Vertex v){
 
-    Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
-    Mesh::Vertex neighbor_v;
-    Mesh::Edge e;
-    Point laplace(0.0);
-
+    // Initialize variables
+    Point acc_laplace = Point(0.0f);
+    Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
+    if(!vh_c) {
+        return Point(0.0f);
+    }
+    Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
+    const Point& refPoint = mesh_.position(v);
+    int num_vertices = 0;
     bool hasBoundaryEdge = false;
 
-    
-    laplace = Point(0.0f);
-
-    vh_c = mesh_.halfedges(v);
-    
-    if(!vh_c) {
-        return laplace;
-    }
-
-    vh_end = vh_c;
-
-    const Point& refPoint = mesh_.position(v);
-
-    int num_vertices = 0;
-
     do {
+        // Increment number of vertices
         num_vertices ++;
         
-        neighbor_v = mesh_.to_vertex(*vh_c);
-        e = mesh_.edge(*vh_c);
+        Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
+        Mesh::Edge e = mesh_.edge(*vh_c);
 
-        if(mesh_.is_boundary(e)){ // we should return 0 if it's a point on the edge of the model
+        // Check for boundary
+        if(mesh_.is_boundary(e)){ 
             hasBoundaryEdge = true;
+            break;
         }
 
         const Point& vi = mesh_.position(neighbor_v);
-        laplace += (vi-refPoint);
+        acc_laplace += (vi-refPoint);
 
     } while(++vh_c != vh_end);
 
     if(hasBoundaryEdge){
+        // Curvature is 0 on boundary
         return Point(0.0f);
+    } else {
+        acc_laplace = acc_laplace/num_vertices;
+        return acc_laplace;
     }
-
-    laplace = laplace/num_vertices;
-
-    return laplace;
-
-    
-        
 }
 
-Point MeshProcessing::caluculateCotanDiscreteLaplacian(Mesh::Vertex v){
+Point MeshProcessing::calculateCotanDiscreteLaplacian(Mesh::Vertex v, bool norm_total_weights){
 
     Mesh::Edge_property<Scalar> e_weight = mesh_.edge_property<Scalar>("e:weight", 0);
-    Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
-    Mesh::Vertex neighbor_v;
-    Mesh::Edge e;
-    Point laplace(0.0);
 
+    // Initialize variables
+    Point acc_laplace(0.0); 
+    Scalar total_weights = 0.f;
+    Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
+    if(!vh_c) {
+        return Point(0.0f);        
+    }
+    Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
+    const Point& refPoint = mesh_.position(v);
     bool hasBoundaryEdge = false;
 
-    laplace = Point(0.0f);
-
-    vh_c = mesh_.halfedges(v);
-    
-    if(!vh_c) {
-        return laplace;
-    }
-
-    vh_end = vh_c;
-
-    const Point& refPoint = mesh_.position(v);
-
-    Scalar total_weights = 0.0f;
+    // Iterate over adjacent vertices
     do {
-        neighbor_v = mesh_.to_vertex(*vh_c);
-        e = mesh_.edge(*vh_c);
+        Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
+        Mesh::Edge e = mesh_.edge(*vh_c);
 
-        if(mesh_.is_boundary(e)){ // we should return 0 if it's a point on the edge of the model
+        // Check for boundary
+        if(mesh_.is_boundary(e)){ 
             hasBoundaryEdge = true;
+            break;
         }
 
         const Point& vi = mesh_.position(neighbor_v);
-        laplace += e_weight[e] * (vi-refPoint);
-
+        acc_laplace += e_weight[e] * (vi-refPoint);
         total_weights += e_weight[e];
 
     } while(++vh_c != vh_end);
 
     if(hasBoundaryEdge){
-        hasBoundaryEdge = false;
+        // Curvature is 0 on boundary
         return Point(0.0f);
+    } else {
+        if (norm_total_weights) {
+            return acc_laplace / total_weights;
+        } else {
+            return acc_laplace;
+        }
     }
-
-    laplace = laplace/total_weights;
-
-    return laplace;
         
 }
 // ======================================================================
@@ -132,7 +117,7 @@ Point MeshProcessing::caluculateCotanDiscreteLaplacian(Mesh::Vertex v){
 // ========================================================================
 void MeshProcessing::uniform_smooth(const unsigned int iterations) {
 
-    Scalar delta_t_lambda = 0.5f; // this is arbitrary and could be changed
+    Scalar delta_t_lambda = 0.2f; // this is arbitrary and could be changed
 
     // We need to implement p'i = pi + delta_t_lambda * L(pi)
     // Where L(pi) = 1 / sum(wj) * sum(wj * (pj - pi) )
@@ -149,7 +134,7 @@ void MeshProcessing::uniform_smooth(const unsigned int iterations) {
 
             const Point& refPoint = mesh_.position(v);
 
-            mesh_.position(v) = refPoint + delta_t_lambda * caluculateUniformDiscreteLaplacian(v);
+            mesh_.position(v) = refPoint + delta_t_lambda * calculateUniformDiscreteLaplacian(v);
 
         }
            
@@ -181,7 +166,7 @@ void MeshProcessing::smooth(const unsigned int iterations) {
 
             const Point& refPoint = mesh_.position(v);
 
-            mesh_.position(v) = refPoint + delta_t_lambda * caluculateCotanDiscreteLaplacian(v);
+            mesh_.position(v) = refPoint + delta_t_lambda * calculateCotanDiscreteLaplacian(v, true);
 
         }
 
@@ -375,91 +360,17 @@ void MeshProcessing::calc_uniform_mean_curvature() {
 
     // Iterate over vertices
     for (auto v: mesh_.vertices()){
-        
-        // Initialize variables
-        Point acc_laplace = Point(0.0f);
-        Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
-        if(!vh_c) {
-            continue;
-        }
-        Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
-        const Point& refPoint = mesh_.position(v);
-        int num_vertices = 0;
-        bool hasBoundaryEdge = false;
-    
-        do {
-            // Increment number of vertices
-            num_vertices ++;
-            
-            Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
-            Mesh::Edge e = mesh_.edge(*vh_c);
-
-            // Check for boundary
-            if(mesh_.is_boundary(e)){ 
-                hasBoundaryEdge = true;
-                break;
-            }
-
-            const Point& vi = mesh_.position(neighbor_v);
-            acc_laplace += (vi-refPoint);
-
-        } while(++vh_c != vh_end);
-
-        if(hasBoundaryEdge){
-            // Curvature is 0 on boundary
-            v_unicurvature[v] = 0.0f;
-        } else {
-            // Multiply by vertex's weight and normalize
-            acc_laplace = acc_laplace/num_vertices;
-            v_unicurvature[v] = norm(acc_laplace);
-        }
-
+        v_unicurvature[v] = norm(calculateUniformDiscreteLaplacian(v));
     }
 }
 
 void MeshProcessing::calc_mean_curvature() {
     
     Mesh::Vertex_property<Scalar>  v_curvature = mesh_.vertex_property<Scalar>("v:curvature", 0);
-    Mesh::Edge_property<Scalar> e_weight = mesh_.edge_property<Scalar>("e:weight", 0);
-    Mesh::Vertex_property<Scalar>  v_weight = mesh_.vertex_property<Scalar>("v:weight", 0);
 
     // Iterate over vertices
     for (auto v: mesh_.vertices()){
-        
-        // Initialize variables
-        Point acc_laplace(0.0);
-        Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
-        if(!vh_c) {
-            continue;
-        }
-        Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
-        const Point& refPoint = mesh_.position(v);
-        bool hasBoundaryEdge = false;
-
-        // Iterate over adjacent vertices
-        do {
-            Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
-            Mesh::Edge e = mesh_.edge(*vh_c);
-
-            // Check for boundary
-            if(mesh_.is_boundary(e)){ 
-                hasBoundaryEdge = true;
-                break;
-            }
-
-            const Point& vi = mesh_.position(neighbor_v);
-            acc_laplace += e_weight[e] * 2.0f * (vi-refPoint);
-
-        } while(++vh_c != vh_end);
-
-        if(hasBoundaryEdge){
-            // Curvature is 0 on boundary
-            v_curvature[v] = 0.0f;
-        } else {
-            // Multiply by vertex's weight and normalize
-            acc_laplace *= v_weight[v];
-            v_curvature[v] = norm(acc_laplace);
-        }
+        v_curvature[v] = norm(calculateCotanDiscreteLaplacian(v, false));
     }
 }
 

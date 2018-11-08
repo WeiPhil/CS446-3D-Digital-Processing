@@ -60,8 +60,8 @@ private:
     void calc_vertices_weights();
 
     // Own functions we added for exercise 7
-    surface_mesh::Point caluculateUniformDiscreteLaplacian(Mesh::Vertex v);
-    surface_mesh::Point caluculateCotanDiscreteLaplacian(Mesh::Vertex v);
+    surface_mesh::Point calculateUniformDiscreteLaplacian(Mesh::Vertex v);
+    surface_mesh::Point calculateCotanDiscreteLaplacian(Mesh::Vertex v, bool norm_total_weights);
 
 private:
     Mesh mesh_;
