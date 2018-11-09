@@ -42,7 +42,7 @@ namespace mesh_processing {
 		for (int i = 0; i < num_iterations; ++i)
 		{
 			split_long_edges();
-			//collapse_short_edges();
+			collapse_short_edges();
 			//equalize_valences();
 			//tangential_relaxation();
 		}
@@ -125,17 +125,17 @@ namespace mesh_processing {
 			// ------------- IMPLEMENT HERE ---------
 
 			hasChangedSmth = false;
-			e_it = mesh_.edges_begin();
 			Scalar edgeLength;
 			Scalar targetLength;
 
-			do {
+			for (e_it = mesh_.edges_begin(); e_it != e_end; ++e_it)
+			{
 				edgeLength = mesh_.edge_length(*e_it);
 				v0 = mesh_.vertex(*e_it, 0);
 				v1 = mesh_.vertex(*e_it, 1);
 				targetLength = (target_length[v0] + target_length[v1]) / 2;
 
-				if (edgeLength > (4 / 3 * targetLength)) {
+				if (edgeLength > ((4 / 3) * targetLength)) {
 					//std::cout << edgeLength << " > " << targetLength << std::endl;
 
 					hasChangedSmth = true;
@@ -159,7 +159,7 @@ namespace mesh_processing {
 					//std::cout << "split" << std::endl;
 				}
 
-			} while (++e_it != e_end);
+			}
 			std::cout << "iterations: " << i << std::endl;
 			if (!hasChangedSmth) {
 				finished = true;
@@ -173,15 +173,19 @@ namespace mesh_processing {
 		Mesh::Edge_iterator     e_it, e_end(mesh_.edges_end());
 		Mesh::Vertex   v0, v1;
 		Mesh::Halfedge  h01, h10;
-		bool            finished, b0, b1;
+		bool            finished, b0, b1, hasChangedSmth;
 		int             i;
 		bool            hcol01, hcol10;
 
 		Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
 
+		hasChangedSmth = false;
+		Scalar edgeLength;
+		Scalar targetLength;
+
 		for (finished = false, i = 0; !finished && i < 100; ++i)
 		{
-			finished = true;
+			//finished = true;
 
 			for (e_it = mesh_.edges_begin(); e_it != e_end; ++e_it)
 			{
@@ -196,8 +200,41 @@ namespace mesh_processing {
 					//		Select the halfedge to be collapsed if at least one halfedge can be collapsed
 					//		Collapse the halfedge
 					// Leave the loop running until no collapse has been done (use the finished variable)
-					// ------------- IMPLEMENT HERE ---------					
+					// ------------- IMPLEMENT HERE ---------	
+
+					edgeLength = mesh_.edge_length(*e_it);
+					v0 = mesh_.vertex(*e_it, 0);
+					v1 = mesh_.vertex(*e_it, 1);
+					targetLength = (target_length[v0] + target_length[v1]) / 2;
+
+					if (edgeLength < (4 / 5) * targetLength) {
+						if (!mesh_.is_boundary(*e_it)) {
+							h01 = mesh_.halfedge(*e_it, 0);
+							h10 = mesh_.halfedge(*e_it, 1);
+							b0 = mesh_.is_collapse_ok(h01);
+							b1 = mesh_.is_collapse_ok(h10);
+							if (b0 && b1) {
+								hasChangedSmth = true;
+								if (mesh_.valence(v0) < mesh_.valence(v1)) {
+									mesh_.collapse(h01);
+								}
+								else {
+									mesh_.collapse(h10);
+								}
+							}else if(b0) {
+								hasChangedSmth = true;
+								mesh_.collapse(h01);
+							}
+							else if (b1) {
+								hasChangedSmth = true;
+								mesh_.collapse(h10);
+							}
+						}
+					}
 				}
+			}
+			if (!hasChangedSmth) {
+				finished = true;
 			}
 		}
 
