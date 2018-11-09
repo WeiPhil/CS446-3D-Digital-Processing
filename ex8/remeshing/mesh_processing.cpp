@@ -42,9 +42,9 @@ namespace mesh_processing {
 		for (int i = 0; i < num_iterations; ++i)
 		{
 			split_long_edges();
-			collapse_short_edges();
-			equalize_valences();
-			tangential_relaxation();
+			//collapse_short_edges();
+			//equalize_valences();
+			//tangential_relaxation();
 		}
 	}
 
@@ -104,16 +104,16 @@ namespace mesh_processing {
 	{
 		Mesh::Edge_iterator     e_it, e_end(mesh_.edges_end());
 		Mesh::Vertex   v0, v1, v;
-		bool            finished;
+		bool            finished, hasChangedSmth;
 		int             i;
 		Point p0, p1, p;
 
 		Mesh::Vertex_property<Point> normals = mesh_.vertex_property<Point>("v:normal");
 		Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
 
+
 		for (finished = false, i = 0; !finished && i < 100; ++i)
 		{
-			finished = true;
 			// ------------- IMPLEMENT HERE ---------
 			// INSERT CODE:
 			//  Compute the desired length as the mean between the property target_length of two vertices of the edge
@@ -123,32 +123,47 @@ namespace mesh_processing {
 			//		split the edge with this vertex (use openMesh function split)
 			// Leave the loop running until no splits are done (use the finished variable)
 			// ------------- IMPLEMENT HERE ---------
-			Scalar edgeLength = mesh_.edge_length(*e_it);
-			v0 = mesh_.vertex(*e_it, 0);
-			v1 = mesh_.vertex(*e_it, 1);
-			Scalar targetLength = (target_length[v0] + target_length[v1]) / 2;
+
+			hasChangedSmth = false;
+			e_it = mesh_.edges_begin();
+			Scalar edgeLength;
+			Scalar targetLength;
 
 			do {
+				edgeLength = mesh_.edge_length(*e_it);
+				v0 = mesh_.vertex(*e_it, 0);
+				v1 = mesh_.vertex(*e_it, 1);
+				targetLength = (target_length[v0] + target_length[v1]) / 2;
+
 				if (edgeLength > (4 / 3 * targetLength)) {
+					//std::cout << edgeLength << " > " << targetLength << std::endl;
+
+					hasChangedSmth = true;
 
 					p0 = mesh_.position(v0);
 					p1 = mesh_.position(v1);
-
-					normals[p0];
-					
-					mesh_.split(*e_it, v);
-
-					mesh_.insert_vertex(*e_it, v);
-
-					
-
 					p = (p0 + p1) / 2;
 
-					mesh_.split(*e_it, v);
+					v = mesh_.add_vertex(p);
+					
+					//std::cout << "added vertex" << std::endl;
 
-					mesh_.add_vertex(p);
+					normals[v] = (normals[v0] + normals[v1]) / 2;
+					target_length[v] = (target_length[v0] + target_length[v1]) / 2;
+
+					//std::cout << "computed normals" << std::endl;
+
+					//mesh_.insert_vertex(*e_it, v);
+					//std::cout << "insert" << std::endl;
+					mesh_.split(*e_it, v);
+					//std::cout << "split" << std::endl;
 				}
-			} while (e_it != e_end);
+
+			} while (++e_it != e_end);
+			std::cout << "iterations: " << i << std::endl;
+			if (!hasChangedSmth) {
+				finished = true;
+			}
 
 		}
 	}
