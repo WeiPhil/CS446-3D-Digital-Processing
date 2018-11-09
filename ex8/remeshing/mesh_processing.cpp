@@ -43,8 +43,8 @@ namespace mesh_processing {
 		{
 			split_long_edges();
 			collapse_short_edges();
-			//equalize_valences();
-			//tangential_relaxation();
+			equalize_valences();
+			tangential_relaxation();
 		}
 	}
 
@@ -266,9 +266,42 @@ namespace mesh_processing {
 					//  Compute the sum of the squared valence deviances after an eventual flip
 					//  If valence deviance is decreased and flip is possible, flip the vertex
 					//  Leave the loop running until no collapse has been done (use the finished variable)
-					// ------------- IMPLEMENT HERE ---------					
+					// ------------- IMPLEMENT HERE ---------
+
+					if (mesh_.is_flip_ok(*e_it)) {
+
+						h = mesh_.halfedge(*e_it, 0);
+						v2 = mesh_.to_vertex(mesh_.next_halfedge(h));
+
+						h = mesh_.halfedge(*e_it, 1);
+						v3 = mesh_.to_vertex(mesh_.next_halfedge(h));
+
+						v0 = mesh_.vertex(*e_it, 0);
+						v1 = mesh_.vertex(*e_it, 1);
+
+						val0 = mesh_.valence(v0);
+						val1 = mesh_.valence(v1);
+						val2 = mesh_.valence(v2);
+						val3 = mesh_.valence(v3);
+
+						ve_before = (val0 - 6)*(val0 - 6) +
+							(val1 - 6)*(val1 - 6) +
+							(val2 - 6)*(val2 - 6) +
+							(val3 - 6)*(val3 - 6);
+
+						ve_after = (val0 - 7)*(val0 - 7) +
+							(val1 - 7)*(val1 - 7) +
+							(val2 - 5)*(val2 - 5) +
+							(val3 - 5)*(val3 - 5);
+
+						if (ve_after < ve_before) {
+							finished = false;
+							mesh_.flip(*e_it);
+						}
+					}
 				}
 			}
+			std::cout << "flip iterations: " << i << std::endl;
 		}
 
 		if (i == 100) std::cerr << "flip break\n";
@@ -279,11 +312,14 @@ namespace mesh_processing {
 		Mesh::Vertex_iterator     v_it, v_end(mesh_.vertices_end());
 		Mesh::Vertex_around_vertex_circulator   vv_c, vv_end;
 		int    valence;
+		int dotProduct;
 		Point     u, n;
 		Point     laplace;
 
 		Mesh::Vertex_property<Point> normals = mesh_.vertex_property<Point>("v:normal");
 		Mesh::Vertex_property<Point> update = mesh_.vertex_property<Point>("v:update");
+
+		Mesh::Vertex_property<Scalar> v_unicurvature;
 
 		// smooth
 		for (int iters = 0; iters < 10; ++iters)
@@ -297,6 +333,40 @@ namespace mesh_processing {
 					//  Compute the tangential component of the laplacian vector and move the vertex
 					//  Store smoothed vertex location in the update vertex property.
 					// ------------- IMPLEMENT HERE ---------
+
+					// Initialize variables
+					laplace = 0.0;
+					vv_c = mesh_.vertices(*v_it);
+					if (!vv_c) {
+						continue;
+					}
+					vv_end = vv_c;
+					const Point& refPoint = mesh_.position(*v_it);
+					int numVertices = 0;
+
+					// Iterate over adjacent vertices    
+					do {
+						++numVertices;
+						const Point& vi = mesh_.position(*vv_c);
+						laplace += vi - refPoint;
+					} while (++vv_c != vv_end);
+
+					// Average and normalize the Laplacian
+					laplace /= numVertices;
+					
+					std::cout << "lapl" << laplace << std::endl;
+					std::cout << "norm" << normals[*v_it] << std::endl;
+
+					dotProduct = laplace.x * normals[*v_it].x + laplace.y * normals[*v_it].y + laplace.z * normals[*v_it].z;
+					std::cout << "u" << u << std::endl;
+
+					n = laplace - u;
+					std::cout << "n" << n << std::endl;
+					update[*v_it] = n;
+
+					break;
+
+
 				}
 			}
 
@@ -309,11 +379,39 @@ namespace mesh_processing {
 	void MeshProcessing::calc_uniform_mean_curvature() {
 		Mesh::Vertex_property<Scalar> v_unicurvature =
 			mesh_.vertex_property<Scalar>("v:unicurvature", 0.0f);
+
 		// ------------- IMPLEMENT HERE ---------
 		// For each non-boundary vertex, approximate mean curvature using
 		// the length of the uniform Laplacian approximation
 		// Save your approximation in unicurvature vertex property of the mesh.
 		// ------------- IMPLEMENT HERE ---------
+
+		Mesh::Vertex_around_vertex_circulator vv_c, vv_end;
+
+		// Iterate over vertices
+		for (auto v : mesh_.vertices()) {
+
+			// Initialize variables
+			Point acc_laplace(0.0);
+			vv_c = mesh_.vertices(v);
+			if (!vv_c) {
+				continue;
+			}
+			vv_end = vv_c;
+			const Point& refPoint = mesh_.position(v);
+			int numVertices = 0;
+
+			// Iterate over adjacent vertices    
+			do {
+				++numVertices;
+				const Point& vi = mesh_.position(*vv_c);
+				acc_laplace += vi - refPoint;
+			} while (++vv_c != vv_end);
+
+			// Average and normalize the Laplacian
+			acc_laplace /= numVertices;
+			v_unicurvature[v] = norm(acc_laplace);
+		}
 	}
 
 	void MeshProcessing::calc_mean_curvature() {
@@ -330,6 +428,7 @@ namespace mesh_processing {
 		// Save your approximation in v_curvature vertex property of the mesh.
 		// Use the weights from calc_weights(): e_weight and v_weight
 		// ------------- IMPLEMENT HERE ---------		
+
 	}
 
 	void MeshProcessing::calc_gauss_curvature() {
