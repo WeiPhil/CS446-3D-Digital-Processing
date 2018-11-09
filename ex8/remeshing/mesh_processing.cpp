@@ -104,7 +104,7 @@ namespace mesh_processing {
 	{
 		Mesh::Edge_iterator     e_it, e_end(mesh_.edges_end());
 		Mesh::Vertex   v0, v1, v;
-		bool            finished, hasChangedSmth;
+		bool            finished;
 		int             i;
 		Point p0, p1, p;
 
@@ -114,6 +114,7 @@ namespace mesh_processing {
 
 		for (finished = false, i = 0; !finished && i < 100; ++i)
 		{
+			finished = true;
 			// ------------- IMPLEMENT HERE ---------
 			// INSERT CODE:
 			//  Compute the desired length as the mean between the property target_length of two vertices of the edge
@@ -124,7 +125,6 @@ namespace mesh_processing {
 			// Leave the loop running until no splits are done (use the finished variable)
 			// ------------- IMPLEMENT HERE ---------
 
-			hasChangedSmth = false;
 			Scalar edgeLength;
 			Scalar targetLength;
 
@@ -138,7 +138,7 @@ namespace mesh_processing {
 				if (edgeLength > ((4 / 3) * targetLength)) {
 					//std::cout << edgeLength << " > " << targetLength << std::endl;
 
-					hasChangedSmth = true;
+					finished = false;
 
 					p0 = mesh_.position(v0);
 					p1 = mesh_.position(v1);
@@ -160,11 +160,7 @@ namespace mesh_processing {
 				}
 
 			}
-			std::cout << "iterations: " << i << std::endl;
-			if (!hasChangedSmth) {
-				finished = true;
-			}
-
+			std::cout << "split iterations: " << i << std::endl;
 		}
 	}
 
@@ -173,19 +169,18 @@ namespace mesh_processing {
 		Mesh::Edge_iterator     e_it, e_end(mesh_.edges_end());
 		Mesh::Vertex   v0, v1;
 		Mesh::Halfedge  h01, h10;
-		bool            finished, b0, b1, hasChangedSmth;
+		bool            finished, b0, b1;
 		int             i;
 		bool            hcol01, hcol10;
 
 		Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
 
-		hasChangedSmth = false;
 		Scalar edgeLength;
 		Scalar targetLength;
 
 		for (finished = false, i = 0; !finished && i < 100; ++i)
 		{
-			//finished = true;
+			finished = true;
 
 			for (e_it = mesh_.edges_begin(); e_it != e_end; ++e_it)
 			{
@@ -207,35 +202,36 @@ namespace mesh_processing {
 					v1 = mesh_.vertex(*e_it, 1);
 					targetLength = (target_length[v0] + target_length[v1]) / 2;
 
-					if (edgeLength < (4 / 5) * targetLength) {
+					//std::cout << edgeLength << " < " << targetLength << std::endl;
+
+					if (edgeLength < ((4 / 5) * targetLength)) {
+						std::cout << "2 smol" << std::endl;
 						if (!mesh_.is_boundary(*e_it)) {
+							std::cout << "not bond" << std::endl;
 							h01 = mesh_.halfedge(*e_it, 0);
 							h10 = mesh_.halfedge(*e_it, 1);
 							b0 = mesh_.is_collapse_ok(h01);
 							b1 = mesh_.is_collapse_ok(h10);
 							if (b0 && b1) {
-								hasChangedSmth = true;
+								finished = false;
 								if (mesh_.valence(v0) < mesh_.valence(v1)) {
 									mesh_.collapse(h01);
-								}
-								else {
+								}else {
 									mesh_.collapse(h10);
 								}
 							}else if(b0) {
-								hasChangedSmth = true;
+								finished = false;
 								mesh_.collapse(h01);
 							}
 							else if (b1) {
-								hasChangedSmth = true;
+								finished = false;
 								mesh_.collapse(h10);
 							}
 						}
 					}
 				}
 			}
-			if (!hasChangedSmth) {
-				finished = true;
-			}
+			std::cout << "collapse iterations: " << i << std::endl;
 		}
 
 		mesh_.garbage_collection();
