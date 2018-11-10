@@ -107,6 +107,8 @@ namespace mesh_processing {
 		bool            finished;
 		int             i;
 		Point p0, p1, p;
+		float avrgLength, avrgDesired;
+		int nmbrPoints, nmbrSplits, nmbrEgdeUnder;
 
 		Mesh::Vertex_property<Point> normals = mesh_.vertex_property<Point>("v:normal");
 		Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
@@ -127,16 +129,33 @@ namespace mesh_processing {
 
 			Scalar edgeLength;
 			Scalar targetLength;
+			avrgDesired = 0;
+			avrgLength = 0;
+			nmbrPoints = 0;
+			nmbrSplits = 0;
+			nmbrEgdeUnder = 0;
 
 			for (e_it = mesh_.edges_begin(); e_it != e_end; ++e_it)
 			{
+
+
 				edgeLength = mesh_.edge_length(*e_it);
 				v0 = mesh_.vertex(*e_it, 0);
 				v1 = mesh_.vertex(*e_it, 1);
 				targetLength = (target_length[v0] + target_length[v1]) / 2;
 
-				if (edgeLength > ((4 / 3) * targetLength)) {
+				
+					avrgLength += edgeLength;
+					avrgDesired += targetLength;
+					++nmbrPoints;
+					if (edgeLength < (04.0f / 3.0f)) {
+						++nmbrEgdeUnder;
+					}
+		
+
+				if (edgeLength > ((4.f / 3.f) * targetLength)) {
 					//std::cout << edgeLength << " > " << targetLength << std::endl;
+					++nmbrSplits;
 
 					finished = false;
 
@@ -160,7 +179,14 @@ namespace mesh_processing {
 				}
 
 			}
-			std::cout << "split iterations: " << i << std::endl;
+			//std::cout << "split iterations: " << i << std::endl;
+			//std::cout << "avrg length: " << avrgLength/nmbrPoints << std::endl;
+			//std::cout << "avrg desired: " << avrgDesired/nmbrPoints << std::endl;
+			//std::cout << "avrg cutoff: " << (4.f/3.f)*avrgDesired / nmbrPoints << std::endl;
+			//std::cout << "nmbr splits: " << nmbrSplits << std::endl;
+			//std::cout << "nmbr egde under 4/3: " << nmbrEgdeUnder << std::endl;
+			//std::cout << "nmbr egdes: " << nmbrPoints << std::endl;
+
 		}
 	}
 
@@ -177,7 +203,7 @@ namespace mesh_processing {
 
 		Scalar edgeLength;
 		Scalar targetLength;
-
+		//100 de base
 		for (finished = false, i = 0; !finished && i < 100; ++i)
 		{
 			finished = true;
@@ -204,17 +230,15 @@ namespace mesh_processing {
 
 					//std::cout << edgeLength << " < " << targetLength << std::endl;
 
-					if (edgeLength < ((4 / 5) * targetLength)) {
-						std::cout << "2 smol" << std::endl;
+					if (edgeLength < ((4.f / 5.f) * targetLength)) {
 						if (!mesh_.is_boundary(*e_it)) {
-							std::cout << "not bond" << std::endl;
 							h01 = mesh_.halfedge(*e_it, 0);
 							h10 = mesh_.halfedge(*e_it, 1);
 							b0 = mesh_.is_collapse_ok(h01);
 							b1 = mesh_.is_collapse_ok(h10);
 							if (b0 && b1) {
 								finished = false;
-								if (mesh_.valence(v0) < mesh_.valence(v1)) {
+								if (mesh_.valence(v0) > mesh_.valence(v1)) {
 									mesh_.collapse(h01);
 								}else {
 									mesh_.collapse(h10);
@@ -231,7 +255,7 @@ namespace mesh_processing {
 					}
 				}
 			}
-			std::cout << "collapse iterations: " << i << std::endl;
+			//std::cout << "collapse iterations: " << i << std::endl;
 		}
 
 		mesh_.garbage_collection();
@@ -272,9 +296,11 @@ namespace mesh_processing {
 
 						h = mesh_.halfedge(*e_it, 0);
 						v2 = mesh_.to_vertex(mesh_.next_halfedge(h));
+						assert(h == mesh_.next_halfedge(mesh_.next_halfedge(mesh_.next_halfedge(h))));
 
 						h = mesh_.halfedge(*e_it, 1);
 						v3 = mesh_.to_vertex(mesh_.next_halfedge(h));
+						assert(h == mesh_.next_halfedge(mesh_.next_halfedge(mesh_.next_halfedge(h))));
 
 						v0 = mesh_.vertex(*e_it, 0);
 						v1 = mesh_.vertex(*e_it, 1);
@@ -301,7 +327,7 @@ namespace mesh_processing {
 					}
 				}
 			}
-			std::cout << "flip iterations: " << i << std::endl;
+			//std::cout << "flip iterations: " << i << std::endl;
 		}
 
 		if (i == 100) std::cerr << "flip break\n";
@@ -312,9 +338,13 @@ namespace mesh_processing {
 		Mesh::Vertex_iterator     v_it, v_end(mesh_.vertices_end());
 		Mesh::Vertex_around_vertex_circulator   vv_c, vv_end;
 		int    valence;
-		int dotProduct;
+		float dotProduct;
 		Point     u, n;
 		Point     laplace;
+		int numVertices;
+		int numBig100;
+		int numSmall10;
+		int totalVertice;
 
 		Mesh::Vertex_property<Point> normals = mesh_.vertex_property<Point>("v:normal");
 		Mesh::Vertex_property<Point> update = mesh_.vertex_property<Point>("v:update");
@@ -324,10 +354,14 @@ namespace mesh_processing {
 		// smooth
 		for (int iters = 0; iters < 10; ++iters)
 		{
+			totalVertice = 0;
+			numBig100 = 0;
+			numSmall10 = 0;
 			for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it)
 			{
 				if (!mesh_.is_boundary(*v_it))
 				{
+					++totalVertice;
 					// ------------- IMPLEMENT HERE ---------
 					//  Compute uniform laplacian curvature approximation vector
 					//  Compute the tangential component of the laplacian vector and move the vertex
@@ -335,14 +369,14 @@ namespace mesh_processing {
 					// ------------- IMPLEMENT HERE ---------
 
 					// Initialize variables
-					laplace = 0.0;
 					vv_c = mesh_.vertices(*v_it);
 					if (!vv_c) {
 						continue;
 					}
 					vv_end = vv_c;
 					const Point& refPoint = mesh_.position(*v_it);
-					int numVertices = 0;
+					laplace = 0.0f;
+					numVertices = 0;
 
 					// Iterate over adjacent vertices    
 					do {
@@ -354,21 +388,32 @@ namespace mesh_processing {
 					// Average and normalize the Laplacian
 					laplace /= numVertices;
 					
-					std::cout << "lapl" << laplace << std::endl;
-					std::cout << "norm" << normals[*v_it] << std::endl;
+					//std::cout << "lapl" << laplace << std::endl;
+					//std::cout << "norm" << normals[*v_it] << std::endl;
+					n = normals[*v_it];
+					dotProduct = laplace.x * n.x + laplace.y * n.y + laplace.z * n.z;
+					//std::cout << "u" << u << std::endl;
 
-					dotProduct = laplace.x * normals[*v_it].x + laplace.y * normals[*v_it].y + laplace.z * normals[*v_it].z;
-					std::cout << "u" << u << std::endl;
-
-					n = laplace - u;
-					std::cout << "n" << n << std::endl;
-					update[*v_it] = n;
-
-					break;
-
-
+					n = n * dotProduct/norm(n);
+					laplace = laplace - n;
+					if (norm(laplace) > 100) {
+						++numBig100;
+					}
+					else if (norm(laplace) < 10) {
+						++numSmall10;
+					}
+					
+					//std::cout << "refoint" << refPoint << std::endl;
+					//std::cout << "laplace: " << norm(laplace) << std::endl;
+					update[*v_it] = laplace;
+					//break;
 				}
+				
 			}
+			//std::cout << "smooth iterations: " << iters << std::endl;
+			//std::cout << "big100: " << numBig100 << std::endl;
+			//std::cout << "smol10: " << numSmall10 << std::endl;
+			//std::cout << "total: " << norm(laplace) << std::endl;
 
 			for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it)
 				if (!mesh_.is_boundary(*v_it))
