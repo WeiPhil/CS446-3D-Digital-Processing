@@ -120,7 +120,7 @@ namespace mesh_processing {
 					//std::cout << "laplace: " << laplace << std::endl;
 					laplace /= numVertices;
 					//std::cout << "laplace 2 : " << laplace << std::endl;
-					target_new_length[*v_it] = target_length[*v_it] + laplace;
+					target_length[*v_it] = target_length[*v_it] + laplace;
 				}
 				
 			}
@@ -129,10 +129,10 @@ namespace mesh_processing {
 			Scalar totalLength = 0;
 
 			for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
-				totalLength += target_new_length[*v_it];
+				totalLength += target_length[*v_it];
 			}
 
-			std::cout << "total length: " << totalLength << std::endl;
+			//std::cout << "total length: " << totalLength << std::endl;
 
 			Scalar avrgLength = totalLength / mesh_.n_vertices();
 
@@ -140,7 +140,7 @@ namespace mesh_processing {
 			std::cout << "tagret length: " << TARGET_LENGTH << std::endl;
 
 			for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
-				target_new_length[*v_it] = target_new_length[*v_it] * (TARGET_LENGTH / avrgLength);
+				target_length[*v_it] = target_length[*v_it] * (TARGET_LENGTH / avrgLength);
 			}
 		}
 	}
