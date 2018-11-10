@@ -296,11 +296,11 @@ namespace mesh_processing {
 
 						h = mesh_.halfedge(*e_it, 0);
 						v2 = mesh_.to_vertex(mesh_.next_halfedge(h));
-						assert(h == mesh_.next_halfedge(mesh_.next_halfedge(mesh_.next_halfedge(h))));
+						//assert(h == mesh_.next_halfedge(mesh_.next_halfedge(mesh_.next_halfedge(h))));
 
 						h = mesh_.halfedge(*e_it, 1);
 						v3 = mesh_.to_vertex(mesh_.next_halfedge(h));
-						assert(h == mesh_.next_halfedge(mesh_.next_halfedge(mesh_.next_halfedge(h))));
+						//assert(h == mesh_.next_halfedge(mesh_.next_halfedge(mesh_.next_halfedge(h))));
 
 						v0 = mesh_.vertex(*e_it, 0);
 						v1 = mesh_.vertex(*e_it, 1);
