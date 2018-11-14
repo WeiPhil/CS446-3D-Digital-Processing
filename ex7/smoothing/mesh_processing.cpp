@@ -95,7 +95,7 @@ Point MeshProcessing::calculateCotanDiscreteLaplacian(Mesh::Vertex v, bool norm_
         }
 
         const Point& vi = mesh_.position(neighbor_v);
-        acc_laplace += e_weight[e] * (vi-refPoint);
+        acc_laplace += e_weight[e] * (vi-refPoint) / 2.0;
         total_weights += e_weight[e];
 
     } while(++vh_c != vh_end);
@@ -112,33 +112,36 @@ Point MeshProcessing::calculateCotanDiscreteLaplacian(Mesh::Vertex v, bool norm_
     }
         
 }
+
 // ======================================================================
 // EXERCISE 1.1
 // ========================================================================
 void MeshProcessing::uniform_smooth(const unsigned int iterations) {
 
-    Scalar delta_t_lambda = 0.2f; // this is arbitrary and could be changed
+    Scalar delta_t_lambda = 0.5f;
 
-    // We need to implement p'i = pi + delta_t_lambda * L(pi)
-    // Where L(pi) = 1 / sum(wj) * sum(wj * (pj - pi) )
-
+    // Number of iterations
     for (unsigned int iter=0; iter<iterations; ++iter) {
 
-         // ------------- IMPLEMENT HERE ---------
-        // For each non-boundary vertex, update its position according to the uniform Laplacian operator
-        // ------------- IMPLEMENT HERE ---------    
-
-        // NON BOUNDARY CASE NOT HANDLED!
-
+        Mesh::Vertex_property<Point> discrete_laplacian = mesh_.add_vertex_property<Point>("v:discrete_laplacian");
+        
         for(auto v : mesh_.vertices()){
-
+            
             const Point& refPoint = mesh_.position(v);
-
-            mesh_.position(v) = refPoint + delta_t_lambda * calculateUniformDiscreteLaplacian(v);
-
+            
+            discrete_laplacian[v] = calculateUniformDiscreteLaplacian(v);
+            
         }
+        
+        for(auto v: mesh_.vertices()){
+            
+            mesh_.position(v) = mesh_.position(v) + delta_t_lambda * discrete_laplacian[v];
+            
+        }
+        
+        
+        mesh_.remove_vertex_property(discrete_laplacian);
            
-
     }
 }
 
@@ -147,29 +150,32 @@ void MeshProcessing::uniform_smooth(const unsigned int iterations) {
 // ========================================================================
 void MeshProcessing::smooth(const unsigned int iterations) {
 
-    Scalar delta_t_lambda = 0.5f; // this is arbitrary and could be changed
+    Scalar delta_t_lambda = 0.5f;
 
+    // Number of iterations
     for (unsigned int iter=0; iter<iterations; ++iter) {
-        // ------------- IMPLEMENT HERE ---------
-        // Perform Cotan Laplacian smoothing:
-        // 1) precompute edge weights using calc_edge_weights()
-        // 2) for each non-boundary vertex, update its position using the normalized cotan Laplacian operator
-        //    (Hint: use the precomputed edge weights in the edge property "e:weight")
-        // ------------- IMPLEMENT HERE ---------
-
-
-         // NON BOUNDARY CASE NOT HANDLED!!
-
-        calc_edges_weights(); // I suppose we must recall this so that it updates
-
+        
+        
+        Mesh::Vertex_property<Point> discrete_laplacian = mesh_.add_vertex_property<Point>("v:discrete_laplacian");
+        
+        // Update edge weights
+        calc_edges_weights();
+        
         for(auto v : mesh_.vertices()){
-
+            
             const Point& refPoint = mesh_.position(v);
-
-            mesh_.position(v) = refPoint + delta_t_lambda * calculateCotanDiscreteLaplacian(v, true);
-
+            
+            discrete_laplacian[v] = calculateCotanDiscreteLaplacian(v, true);
+            
         }
-
+        
+        for(auto v: mesh_.vertices()){
+            
+            mesh_.position(v) = mesh_.position(v) + delta_t_lambda * discrete_laplacian[v];
+            
+        }
+        
+        mesh_.remove_vertex_property(discrete_laplacian);
     }
 }
 
@@ -195,6 +201,7 @@ void MeshProcessing::implicit_smoothing(const double timestep) {
     // nonzero elements of A as triplets: (row, column, value)
     std::vector< Eigen::Triplet<double> > triplets;
 
+    // Taken from -> https://fr.wikipedia.org/wiki/Coefficient_de_diffusion 
     Scalar diffusion = 1.37f/(M_PI*M_PI);
     Scalar delta_t_lambda = timestep * diffusion;
 
@@ -243,7 +250,6 @@ void MeshProcessing::implicit_smoothing(const double timestep) {
     // build sparse matrix from triplets
     A.setFromTriplets(triplets.begin(), triplets.end());
 
-
     // solve A*X = B
     Eigen::SimplicialLDLT< Eigen::SparseMatrix<double> > solver(A);
     Eigen::MatrixXd X = solver.solve(B);
@@ -267,34 +273,26 @@ void MeshProcessing::implicit_smoothing(const double timestep) {
 void MeshProcessing::uniform_laplacian_enhance_feature(const unsigned int iterations,
                                                        const unsigned int coefficient) {
 
-    // ------------- IMPLEMENT HERE ---------
-    // Feature enhancement using the uniform Laplacian operator:
-    // 1) perform uniform Laplacian smoothing for enhancement_smoothing_iterations iterations
-    // 2) update the vertex positions according to the difference between the original and the smoothed mesh,
-    //    using enhancement_coef as the value of alpha in the feature enhancement formula
-    // ------------- IMPLEMENT HERE ---------
-
     Mesh::Vertex_property<Point> points_in = mesh_.add_vertex_property<Point>("points_in");
     Mesh::Vertex_property<Point> points_out = mesh_.add_vertex_property<Point>("points_out");
 
+    // Copy the mesh vertices in points_in 
     for(auto v : mesh_.vertices()){
         points_in[v] = mesh_.position(v);
-
     }
 
+    // Uniform smoothing    
     uniform_smooth(iterations);
 
+    // Copy the mesh vertices in points_out
     for(auto v : mesh_.vertices()){
         points_out[v] = mesh_.position(v);
-
     }
-
-    Eigen::MatrixXf pout = *get_points();
 
     int n = mesh_.n_vertices();
 
+    // Update mesh vertices
     auto points = mesh_.vertex_property<Point>("v:point");
-
     for(auto v : mesh_.vertices()){ 
         for (int dim = 0; dim < 3; ++dim)
             points[v][dim] = points_in[v][dim] + coefficient * (points_in[v][dim] - points_out[v][dim]);
@@ -312,40 +310,33 @@ void MeshProcessing::uniform_laplacian_enhance_feature(const unsigned int iterat
 void MeshProcessing::cotan_laplacian_enhance_feature(const unsigned int iterations,
                                                       const unsigned int coefficient) {
 
-    // ------------- IMPLEMENT HERE ---------
-    // Feature enhancement using the normalized cotan Laplacian operator:
-    // 1) perform cotan Laplacian smoothing for enhancement_smoothing_iterations iterations
-    // 2) update the vertex positions according to the difference between the original and the smoothed mesh,
-    //    using enhancement_coef as the value of alpha in the feature enhancement formula
-    // ------------- IMPLEMENT HERE ---------
     Mesh::Vertex_property<Point> points_in = mesh_.add_vertex_property<Point>("points_in");
     Mesh::Vertex_property<Point> points_out = mesh_.add_vertex_property<Point>("points_out");
 
+    // Copy the mesh vertices in points_in
     for(auto v : mesh_.vertices()){
         points_in[v] = mesh_.position(v);
-
     }
 
+    // Cotangent smoothing
     smooth(iterations);
 
+    // Copy the mesh vertices in points_out
     for(auto v : mesh_.vertices()){
         points_out[v] = mesh_.position(v);
-
     }
 
     int n = mesh_.n_vertices();
 
+    // Update mesh vertices
     auto points = mesh_.vertex_property<Point>("v:point");
-
     for(auto v : mesh_.vertices()){
         for (int dim = 0; dim < 3; ++dim)
             points[v][dim] = points_in[v][dim] + coefficient * (points_in[v][dim] - points_out[v][dim]);
-
     }
 
     mesh_.remove_vertex_property(points_in);
     mesh_.remove_vertex_property(points_out);
-
 
 }
 
