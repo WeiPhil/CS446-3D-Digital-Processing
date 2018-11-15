@@ -57,8 +57,9 @@ public:
     void calc_gauss_curvature();
 
 	/* Defined by us */
-	Point MeshProcessing::calculateUniformDiscreteLaplacian(Mesh::Vertex v);
-	Point MeshProcessing::calculateCotanDiscreteLaplacian(Mesh::Vertex v, bool norm_total_weights);
+	Point calculateUniformDiscreteLaplacian(Mesh::Vertex v);
+	Point calculateCotanDiscreteLaplacian(Mesh::Vertex v, bool norm_total_weights);
+    surface_mesh::Scalar calculateUniformDiscreteLaplacianTargetLength(Mesh::Vertex v);
 
 private:
     void calc_weights();

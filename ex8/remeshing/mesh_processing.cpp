@@ -49,23 +49,19 @@ namespace mesh_processing {
 	}
 
 	void MeshProcessing::calc_target_length(const REMESHING_TYPE &remeshing_type) {
-		Mesh::Vertex_iterator        v_it, v_end(mesh_.vertices_end());
-		Mesh::Vertex_around_vertex_circulator  vv_c, vv_end;
-		Scalar                   length;
-		Scalar                   mean_length;
-		Scalar                   H;
-		Scalar                   K;
 
 		Mesh::Vertex_property<Scalar> curvature = mesh_.vertex_property<Scalar>("v:meancurvature", 0);
 		Mesh::Vertex_property<Scalar> gauss_curvature = mesh_.vertex_property<Scalar>("v:gausscurvature", 0);
 		Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
 		Mesh::Vertex_property<Scalar> target_new_length = mesh_.vertex_property<Scalar>("v:newlength", 0);
 
+		const unsigned int SMOOTH_IT = 5;
 		const float TARGET_LENGTH = 2.0;
+		Mesh::Vertex_iterator v_end{mesh_.vertices_end()};
 
 		if (remeshing_type == AVERAGE)
 		{
-			for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it)
+			for (Mesh::Vertex_iterator v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it)
 				target_length[*v_it] = TARGET_LENGTH;
 
 		}
@@ -78,70 +74,57 @@ namespace mesh_processing {
 			// Rescale the property target_new_length such that it's mean equals the user specified TARGET_LENGTH
 			// ------------- IMPLEMENT HERE ---------
 
-			Mesh::Vertex_property<Scalar> curvature1 = mesh_.vertex_property<Scalar>("v:curvature", 0);
-			Mesh::Vertex_property<Scalar> gauss_curvature1 = mesh_.vertex_property<Scalar>("v:gauss_curvature", 0);
-
-			calc_mean_curvature();
-			calc_gauss_curvature();
-
 			// calculate desired length
-			for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
-				length = 1.0;
-				if (!mesh_.is_boundary(*v_it)) {
-					length = 1 / (curvature1[*v_it] + sqrt((curvature1[*v_it] * curvature1[*v_it]) - gauss_curvature1[*v_it]));
-					//std::cout << "length: " << length << std::endl;
+			for (Mesh::Vertex_iterator v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
+
+				Mesh::Vertex cVertex = *v_it;
+				Scalar length = 1.f;
+
+				if (!mesh_.is_boundary(cVertex)) {
+					Scalar mean_curvature = curvature[cVertex];
+					Scalar gaussian_curvature = gauss_curvature[cVertex];
+					Scalar k = mean_curvature + sqrt(max(0.f, mean_curvature * mean_curvature - gaussian_curvature));
+					length /= max(abs(k), 0.001f);
 				}
-				target_length[*v_it] = length;
+
+				target_length[cVertex] = length;
 			}
 
-			Scalar laplace;
-			int numVertices;
+
 			// smooth desired length
-			for (int i = 0; i < 5; i++) {
-				for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
-					// Initialize variables
-					vv_c = mesh_.vertices(*v_it);
-					if (!vv_c) {
-						continue;
-					}
-					vv_end = vv_c;
-					const Scalar& refPoint = target_length[*v_it];
-					laplace = 0.0f;
-					numVertices = 0;
+			for (unsigned int i = 0; i < SMOOTH_IT; i++) {
+ 				for(auto v: mesh_.vertices()) {
+            		target_new_length[v] = calculateUniformDiscreteLaplacianTargetLength(v);
+        		}
+				for(auto v: mesh_.vertices()) {
+            		target_new_length[v] = target_new_length[v];
+        		}
+			}
 
-					// Iterate over adjacent vertices    
-					do {
-						++numVertices;
-						const Scalar& vi = target_length[*vv_c];
-						laplace += vi - refPoint;
-					} while (++vv_c != vv_end);
+			// Compute actual mean target length 
+			Scalar actual_mean = 0.f;
+			for(auto v: mesh_.vertices()) {
+				actual_mean += target_length[v];
+			}
+			actual_mean /= mesh_.n_vertices();
+			Scalar ratio_mean = actual_mean / TARGET_LENGTH; 
+			std::cout << "Mean ratio is " << ratio_mean << std::endl;
 
-					// Average and normalize the Laplacian
-					//std::cout << "laplace: " << laplace << std::endl;
-					laplace /= numVertices;
-					//std::cout << "laplace 2 : " << laplace << std::endl;
-					target_length[*v_it] = target_length[*v_it] + laplace;
+			// Rescale to desired length
+			for (Mesh::Vertex_iterator v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
+				target_length[*v_it] /= ratio_mean; 
+			}
+
+			// test
+			Scalar postMean = 0.f;
+			for (auto v: mesh_.vertices()) {
+				postMean += target_length[v];
+				if (target_length[v] <= 0.f) {
+					std::cout << "Dégueulasse " << target_length[v] << std::endl;
 				}
-
 			}
+			std::cout << "Postmean is " << postMean / mesh_.n_vertices() << std::endl;
 
-			// rescale desired length
-			Scalar totalLength = 0;
-
-			for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
-				totalLength += target_length[*v_it];
-			}
-
-			//std::cout << "total length: " << totalLength << std::endl;
-
-			Scalar avrgLength = totalLength / mesh_.n_vertices();
-
-			std::cout << "avrg length: " << avrgLength << std::endl;
-			std::cout << "tagret length: " << TARGET_LENGTH << std::endl;
-
-			for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
-				target_length[*v_it] = target_length[*v_it] * (TARGET_LENGTH / avrgLength);
-			}
 		}
 	}
 
@@ -238,8 +221,9 @@ namespace mesh_processing {
 						// Check which halfedge is collapsable
 						Mesh::Halfedge h0 = mesh_.halfedge(cEdge, 0);
 						Mesh::Halfedge h1 = mesh_.halfedge(cEdge, 1);
-						bool collapse0 = mesh_.is_collapse_ok(h0);
-						bool collapse1 = mesh_.is_collapse_ok(h1);
+
+						bool collapse0 = mesh_.is_collapse_ok(h0) && !(mesh_.is_boundary(v1) && !mesh_.is_boundary(v0));
+						bool collapse1 = mesh_.is_collapse_ok(h1) && !(mesh_.is_boundary(v0) && !mesh_.is_boundary(v1));;
 
 						// Finished is set to false when at least one of the halfedge is collapsable
 						finished = !(collapse0 || collapse1);
@@ -328,8 +312,7 @@ namespace mesh_processing {
 		if (i == MAX_IT && !finished) std::cerr << "flip break\n";
 	}
 
-	void MeshProcessing::tangential_relaxation()
-	{
+	void MeshProcessing::tangential_relaxation() {
 		// Number of iterations
 		const unsigned int NB_IT = 10;
 
@@ -403,6 +386,48 @@ namespace mesh_processing {
 		else {
 			acc_laplace = acc_laplace / num_vertices;
 			return acc_laplace;
+		}
+	}
+
+	Scalar MeshProcessing::calculateUniformDiscreteLaplacianTargetLength(Mesh::Vertex v) {
+
+		// Get property
+		Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:newlength", 0);
+
+		// Initialize variables
+		Scalar acc_length = 0.f;
+		Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
+		if (!vh_c) {
+			return 0.f;
+		}
+		Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
+		int num_vertices = 0;
+		bool hasBoundaryEdge = false;
+
+		do {
+			// Increment number of vertices
+			num_vertices++;
+
+			Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
+			Mesh::Edge e = mesh_.edge(*vh_c);
+
+			// Check for boundary
+			if (mesh_.is_boundary(e)) {
+				hasBoundaryEdge = true;
+				break;
+			}
+
+			acc_length += (target_length[neighbor_v] - target_length[v]);
+
+		} while (++vh_c != vh_end);
+
+		if (hasBoundaryEdge) {
+			// Curvature is 0 on boundary
+			return 0.f;
+		}
+		else {
+			acc_length /= num_vertices;
+			return acc_length;
 		}
 	}
 
@@ -760,8 +785,7 @@ namespace mesh_processing {
 	}
 
 	void MeshProcessing::set_color(Mesh::Vertex v, const Color& col,
-		Mesh::Vertex_property<Color> color_prop)
-	{
+		Mesh::Vertex_property<Color> color_prop) {
 		color_prop[v] = col;
 	}
 
