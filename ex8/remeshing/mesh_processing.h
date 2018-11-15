@@ -20,6 +20,8 @@ typedef Eigen::Matrix<uint32_t, Eigen::Dynamic, Eigen::Dynamic> MatrixXu;
 namespace mesh_processing {
 
 using std::string;
+using surface_mesh::Point;
+
 enum REMESHING_TYPE : int { AVERAGE = 0, CURV = 1 };
 
 class MeshProcessing {
@@ -53,6 +55,10 @@ public:
     void calc_mean_curvature();
     void calc_uniform_mean_curvature();
     void calc_gauss_curvature();
+
+	/* Defined by us */
+	Point MeshProcessing::calculateUniformDiscreteLaplacian(Mesh::Vertex v);
+	Point MeshProcessing::calculateCotanDiscreteLaplacian(Mesh::Vertex v, bool norm_total_weights);
 
 private:
     void calc_weights();
