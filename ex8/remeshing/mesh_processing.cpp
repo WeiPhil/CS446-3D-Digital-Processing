@@ -200,28 +200,33 @@ namespace mesh_processing {
 		}
 	}
 
-	void MeshProcessing::collapse_short_edges()
-	{
-		Mesh::Edge_iterator     e_it, e_end(mesh_.edges_end());
-		Mesh::Vertex   v0, v1;
-		Mesh::Halfedge  h01, h10;
-		bool            finished, b0, b1;
-		int             i;
-		bool            hcol01, hcol10;
+	void MeshProcessing::collapse_short_edges() {
 
+		/* ===============
+			TODO: update the edge set while iterating ok ? If no store all modifs in a vector
+			and update everything at once at the end of the current iteration
+			TODO: in each way does mesh_.collapse() work ?
+		   =============== */
+
+		   // Maximum number of iterations
+		const unsigned int MAX_IT = 100;
+
+		// Get properties
 		Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
 
-		Scalar edgeLength;
-		Scalar targetLength;
-		//100 de base
-		for (finished = false, i = 0; !finished && i < 100; ++i)
-		{
+		unsigned int i = 0;
+		bool finished = false;
+		for (; !finished && i < MAX_IT; ++i) {
+
+			// Finished is true by default
 			finished = true;
 
-			for (e_it = mesh_.edges_begin(); e_it != e_end; ++e_it)
-			{
-				if (!mesh_.is_deleted(*e_it)) // might already be deleted
-				{
+			// Iterate over edges
+			Mesh::Edge_iterator e_end{ mesh_.edges_end() };
+			for (Mesh::Edge_iterator e_it = mesh_.edges_begin(); e_it != e_end; ++e_it) {
+
+				if (!mesh_.is_deleted(*e_it)) { // The edge might already have been deleted
+
 					// ------------- IMPLEMENT HERE ---------
 					// INSERT CODE:
 					// Compute the desired length as the mean between the property vtargetlength_ of two vertices of the edge
@@ -233,46 +238,43 @@ namespace mesh_processing {
 					// Leave the loop running until no collapse has been done (use the finished variable)
 					// ------------- IMPLEMENT HERE ---------	
 
-					edgeLength = mesh_.edge_length(*e_it);
-					v0 = mesh_.vertex(*e_it, 0);
-					v1 = mesh_.vertex(*e_it, 1);
-					targetLength = (target_length[v0] + target_length[v1]) / 2;
+					Mesh::Edge cEdge = *e_it;
 
-					//std::cout << edgeLength << " < " << targetLength << std::endl;
+					// Get both endpoints, edge length, and target length
+					Mesh::Vertex v0 = mesh_.vertex(cEdge, 0);
+					Mesh::Vertex v1 = mesh_.vertex(cEdge, 1);
+					Scalar targetLength = (target_length[v0] + target_length[v1]) / 2;
+					Scalar edgeLength = mesh_.edge_length(cEdge);
 
+					// Check collapsing condition
 					if (edgeLength < ((4.f / 5.f) * targetLength)) {
-						if (!mesh_.is_boundary(*e_it)) {
-							h01 = mesh_.halfedge(*e_it, 0);
-							h10 = mesh_.halfedge(*e_it, 1);
-							b0 = mesh_.is_collapse_ok(h01);
-							b1 = mesh_.is_collapse_ok(h10);
-							if (b0 && b1) {
-								finished = false;
-								if (mesh_.valence(v0) > mesh_.valence(v1)) {
-									mesh_.collapse(h01);
-								}
-								else {
-									mesh_.collapse(h10);
-								}
-							}
-							else if (b0) {
-								finished = false;
-								mesh_.collapse(h01);
-							}
-							else if (b1) {
-								finished = false;
-								mesh_.collapse(h10);
-							}
+
+						// Check which halfedge is collapsable
+						Mesh::Halfedge h0 = mesh_.halfedge(cEdge, 0);
+						Mesh::Halfedge h1 = mesh_.halfedge(cEdge, 1);
+						bool collapse0 = mesh_.is_collapse_ok(h0);
+						bool collapse1 = mesh_.is_collapse_ok(h1);
+
+						// Finished is set to false when at least one of the halfedge is collapsable
+						finished = !(collapse0 || collapse1);
+
+						// Collapse the correct halfedge
+						if (collapse0 && collapse1) {
+							if (mesh_.valence(v0) > mesh_.valence(v1))	mesh_.collapse(h0);
+							else										mesh_.collapse(h1);
+						}
+						else {
+							if (collapse0)								mesh_.collapse(h0);
+							else if (collapse1)							mesh_.collapse(h1);
 						}
 					}
 				}
 			}
-			//std::cout << "collapse iterations: " << i << std::endl;
 		}
 
 		mesh_.garbage_collection();
 
-		if (i == 100) std::cerr << "collapse break\n";
+		if (i == MAX_IT && !finished) std::cerr << "collapse break\n";
 	}
 
 	void MeshProcessing::equalize_valences()
