@@ -84,20 +84,20 @@ namespace mesh_processing {
 					Scalar mean_curvature = curvature[cVertex];
 					Scalar gaussian_curvature = gauss_curvature[cVertex];
 					Scalar k = mean_curvature + sqrt(max(0.f, mean_curvature * mean_curvature - gaussian_curvature));
-					length /= max(abs(k), 0.001f);
+					length /= max(abs(k), 0.00001f);
 				}
 
 				target_length[cVertex] = length;
 			}
 
 
-			// smooth desired length
+			// Smooth with uniform Laplacian
 			for (unsigned int i = 0; i < SMOOTH_IT; i++) {
  				for(auto v: mesh_.vertices()) {
-            		target_new_length[v] = calculateUniformDiscreteLaplacianTargetLength(v);
+					target_new_length[v] = max(abs(calculateUniformDiscreteLaplacianTargetLength(v)), 0.00001f);
         		}
 				for(auto v: mesh_.vertices()) {
-            		target_new_length[v] = target_new_length[v];
+					target_length[v] = target_new_length[v];
         		}
 			}
 
@@ -130,11 +130,6 @@ namespace mesh_processing {
 
 	void MeshProcessing::split_long_edges() {
 		
-		/* ===============
-			TODO: update the edge set while iterating ok ? If no store all modifs in a vector
-			and update everything at once at the end of the current iteration
-		   =============== */
-
 		// Maximum number of iterations
 		const unsigned int MAX_IT = 100;
 
@@ -149,6 +144,8 @@ namespace mesh_processing {
 			// Finished is true by default
 			finished = true;
 
+			cout << "Number of edges: " << mesh_.n_edges() << endl;
+			int j = 0;
 			// Iterate over edges
 			Mesh::Edge_iterator e_end{ mesh_.edges_end() };
 			for (Mesh::Edge_iterator e_it = mesh_.edges_begin(); e_it != e_end; ++e_it) {
@@ -163,7 +160,9 @@ namespace mesh_processing {
 
 				// Check splitting condition
 				if (edgeLength > ((4.f / 3.f) * targetLength)) {
-
+					
+					//cout << "Edge split: " << j << endl;
+					j++;
 					// Finished is set to false when an edge is splitted
 					finished = false;
 
@@ -179,15 +178,13 @@ namespace mesh_processing {
 					mesh_.split(cEdge, v);
 				}
 			}
+
+			cout << "Number of edges splitted: " << j << endl;
+
 		}
 	}
 
 	void MeshProcessing::collapse_short_edges() {
-
-		/* ===============
-			TODO: update the edge set while iterating ok ? If no store all modifs in a vector
-			and update everything at once at the end of the current iteration
-		   =============== */
 
 		// Maximum number of iterations
 		const unsigned int MAX_IT = 100;
@@ -249,11 +246,6 @@ namespace mesh_processing {
 
 	void MeshProcessing::equalize_valences() {
 		
-		/* ===============
-			TODO: update the edge set while iterating ok ? If no store all modifs in a vector
-			and update everything at once at the end of the current iteration
-		=============== */
-
 		// Constants
 		const unsigned int MAX_IT = 100;
 		const unsigned int VAL_BOUNDARY = 4;
@@ -313,6 +305,7 @@ namespace mesh_processing {
 	}
 
 	void MeshProcessing::tangential_relaxation() {
+		
 		// Number of iterations
 		const unsigned int NB_IT = 10;
 
@@ -392,7 +385,7 @@ namespace mesh_processing {
 	Scalar MeshProcessing::calculateUniformDiscreteLaplacianTargetLength(Mesh::Vertex v) {
 
 		// Get property
-		Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:newlength", 0);
+		Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
 
 		// Initialize variables
 		Scalar acc_length = 0.f;
@@ -412,10 +405,10 @@ namespace mesh_processing {
 			Mesh::Edge e = mesh_.edge(*vh_c);
 
 			// Check for boundary
-			if (mesh_.is_boundary(e)) {
+			/*if (mesh_.is_boundary(e)) {
 				hasBoundaryEdge = true;
 				break;
-			}
+			}*/
 
 			acc_length += (target_length[neighbor_v] - target_length[v]);
 
@@ -426,8 +419,7 @@ namespace mesh_processing {
 			return 0.f;
 		}
 		else {
-			acc_length /= num_vertices;
-			return acc_length;
+			return acc_length / num_vertices;
 		}
 	}
 
