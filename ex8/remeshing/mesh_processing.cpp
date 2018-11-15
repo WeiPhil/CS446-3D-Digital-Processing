@@ -208,7 +208,7 @@ namespace mesh_processing {
 			TODO: in each way does mesh_.collapse() work ?
 		   =============== */
 
-		   // Maximum number of iterations
+		// Maximum number of iterations
 		const unsigned int MAX_IT = 100;
 
 		// Get properties
@@ -225,20 +225,8 @@ namespace mesh_processing {
 			Mesh::Edge_iterator e_end{ mesh_.edges_end() };
 			for (Mesh::Edge_iterator e_it = mesh_.edges_begin(); e_it != e_end; ++e_it) {
 
-				if (!mesh_.is_deleted(*e_it)) { // The edge might already have been deleted
-
-					// ------------- IMPLEMENT HERE ---------
-					// INSERT CODE:
-					// Compute the desired length as the mean between the property vtargetlength_ of two vertices of the edge
-					// If the edge is shorter than 4/5 of the desired length
-					//		Check if halfedge connects a boundary vertex with a non-boundary vertex. If so, don't collapse.
-					//		Check if halfedges collapsible
-					//		Select the halfedge to be collapsed if at least one halfedge can be collapsed
-					//		Collapse the halfedge
-					// Leave the loop running until no collapse has been done (use the finished variable)
-					// ------------- IMPLEMENT HERE ---------	
-
-					Mesh::Edge cEdge = *e_it;
+				Mesh::Edge cEdge = *e_it;
+				if (!mesh_.is_deleted(cEdge)) { // The edge might already have been deleted
 
 					// Get both endpoints, edge length, and target length
 					Mesh::Vertex v0 = mesh_.vertex(cEdge, 0);
@@ -277,74 +265,69 @@ namespace mesh_processing {
 		if (i == MAX_IT && !finished) std::cerr << "collapse break\n";
 	}
 
-	void MeshProcessing::equalize_valences()
-	{
-		Mesh::Edge_iterator     e_it, e_end(mesh_.edges_end());
-		Mesh::Vertex   v0, v1, v2, v3;
-		Mesh::Halfedge   h;
-		int             val0, val1, val2, val3;
-		int             val_opt0, val_opt1, val_opt2, val_opt3;
-		int             ve0, ve1, ve2, ve3, ve_before, ve_after;
-		bool            finished;
-		int             i;
+	void MeshProcessing::equalize_valences() {
+		
+		/* ===============
+			TODO: update the edge set while iterating ok ? If no store all modifs in a vector
+			and update everything at once at the end of the current iteration
+		=============== */
 
+		// Constants
+		const unsigned int MAX_IT = 100;
+		const unsigned int VAL_BOUNDARY = 4;
+		const unsigned int VAL_INTERIOR = 6;
 
-		// flip all edges
-		for (finished = false, i = 0; !finished && i < 100; ++i)
-		{
+		unsigned int i = 0;
+		bool finished = false;
+		for (; !finished && i < MAX_IT; ++i) {
+			
+			// Finished is true by default
 			finished = true;
 
-			for (e_it = mesh_.edges_begin(); e_it != e_end; ++e_it)
-			{
-				if (!mesh_.is_boundary(*e_it))
-				{
-					// ------------- IMPLEMENT HERE ---------
-					//  Extract valences of the four vertices involved to an eventual flip.
-					//  Compute the sum of the squared valence deviances before flip
-					//  Compute the sum of the squared valence deviances after an eventual flip
-					//  If valence deviance is decreased and flip is possible, flip the vertex
-					//  Leave the loop running until no collapse has been done (use the finished variable)
-					// ------------- IMPLEMENT HERE ---------
+			// Iterate over edges
+			Mesh::Edge_iterator e_end{ mesh_.edges_end() };
+			for (Mesh::Edge_iterator e_it = mesh_.edges_begin(); e_it != e_end; ++e_it) {
+				
+				Mesh::Edge cEdge = *e_it;
 
-					if (mesh_.is_flip_ok(*e_it)) {
+				if (!mesh_.is_boundary(cEdge)) {
 
-						h = mesh_.halfedge(*e_it, 0);
-						v2 = mesh_.to_vertex(mesh_.next_halfedge(h));
-						//assert(h == mesh_.next_halfedge(mesh_.next_halfedge(mesh_.next_halfedge(h))));
+					// Check if flipping this edge is possible
+					if (mesh_.is_flip_ok(cEdge)) {
 
-						h = mesh_.halfedge(*e_it, 1);
-						v3 = mesh_.to_vertex(mesh_.next_halfedge(h));
-						//assert(h == mesh_.next_halfedge(mesh_.next_halfedge(mesh_.next_halfedge(h))));
+						// Edge endpoints
+						Mesh::Vertex v0 = mesh_.vertex(cEdge, 0);
+						Mesh::Vertex v1 = mesh_.vertex(cEdge, 1);
 
-						v0 = mesh_.vertex(*e_it, 0);
-						v1 = mesh_.vertex(*e_it, 1);
+						// Neighbor vertices
+						Mesh::Vertex v2 = mesh_.to_vertex(mesh_.next_halfedge(mesh_.halfedge(cEdge, 0)));
+						Mesh::Vertex v3 = mesh_.to_vertex(mesh_.next_halfedge(mesh_.halfedge(cEdge, 1)));
 
-						val0 = mesh_.valence(v0);
-						val1 = mesh_.valence(v1);
-						val2 = mesh_.valence(v2);
-						val3 = mesh_.valence(v3);
+						// Get valence deviation for each vertex
+						unsigned int diff0 = mesh_.valence(v0) - (mesh_.is_boundary(v0) ? VAL_BOUNDARY : VAL_INTERIOR);
+						unsigned int diff1 = mesh_.valence(v1) - (mesh_.is_boundary(v1) ? VAL_BOUNDARY : VAL_INTERIOR);
+						unsigned int diff2 = mesh_.valence(v2) - (mesh_.is_boundary(v2) ? VAL_BOUNDARY : VAL_INTERIOR);
+						unsigned int diff3 = mesh_.valence(v3) - (mesh_.is_boundary(v3) ? VAL_BOUNDARY : VAL_INTERIOR);
+						
+						unsigned int preFlipValence = (diff0 * diff0) + (diff1 * diff1) + (diff2 * diff2) + (diff3 * diff3);
 
-						ve_before = (val0 - 6)*(val0 - 6) +
-							(val1 - 6)*(val1 - 6) +
-							(val2 - 6)*(val2 - 6) +
-							(val3 - 6)*(val3 - 6);
+						// Simulate an edge flip
+						diff0 -= 1; diff1 -= 1;
+						diff2 += 1; diff3 += 1;
 
-						ve_after = (val0 - 7)*(val0 - 7) +
-							(val1 - 7)*(val1 - 7) +
-							(val2 - 5)*(val2 - 5) +
-							(val3 - 5)*(val3 - 5);
+						unsigned int postFlipValence = (diff0 * diff0) + (diff1 * diff1) + (diff2 * diff2) + (diff3 * diff3);
 
-						if (ve_after < ve_before) {
+						// Flip if post-flip valence would be lower than current variance
+						if (preFlipValence > postFlipValence) {
 							finished = false;
-							mesh_.flip(*e_it);
+							mesh_.flip(cEdge);
 						}
 					}
 				}
 			}
-			//std::cout << "flip iterations: " << i << std::endl;
 		}
 
-		if (i == 100) std::cerr << "flip break\n";
+		if (i == MAX_IT && !finished) std::cerr << "flip break\n";
 	}
 
 	void MeshProcessing::tangential_relaxation()
