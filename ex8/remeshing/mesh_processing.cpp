@@ -147,7 +147,6 @@ namespace mesh_processing {
 
 	void MeshProcessing::split_long_edges() {
 		
-
 		/* ===============
 			TODO: update the edge set while iterating ok ? If no store all modifs in a vector
 			and update everything at once at the end of the current iteration
@@ -205,7 +204,6 @@ namespace mesh_processing {
 		/* ===============
 			TODO: update the edge set while iterating ok ? If no store all modifs in a vector
 			and update everything at once at the end of the current iteration
-			TODO: in each way does mesh_.collapse() work ?
 		   =============== */
 
 		// Maximum number of iterations
@@ -332,89 +330,38 @@ namespace mesh_processing {
 
 	void MeshProcessing::tangential_relaxation()
 	{
-		Mesh::Vertex_iterator     v_it, v_end(mesh_.vertices_end());
-		Mesh::Vertex_around_vertex_circulator   vv_c, vv_end;
-		int    valence;
-		float dotProduct;
-		Point     u, n;
-		Point     laplace;
-		int numVertices;
-		int numBig100;
-		int numSmall10;
-		int totalVertice;
+		// Number of iterations
+		const unsigned int NB_IT = 10;
 
+		// Get properties
 		Mesh::Vertex_property<Point> normals = mesh_.vertex_property<Point>("v:normal");
 		Mesh::Vertex_property<Point> update = mesh_.vertex_property<Point>("v:update");
 
-		Mesh::Vertex_property<Scalar> v_unicurvature;
+		Mesh::Vertex_iterator v_end{ mesh_.vertices_end() };
 
-		// smooth
-		for (int iters = 0; iters < 10; ++iters)
-		{
-			totalVertice = 0;
-			numBig100 = 0;
-			numSmall10 = 0;
-			for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it)
-			{
-				if (!mesh_.is_boundary(*v_it))
-				{
-					++totalVertice;
-					// ------------- IMPLEMENT HERE ---------
-					//  Compute uniform laplacian curvature approximation vector
-					//  Compute the tangential component of the laplacian vector and move the vertex
-					//  Store smoothed vertex location in the update vertex property.
-					// ------------- IMPLEMENT HERE ---------
+		// Smooth the mesh's triangles
+		for (unsigned int iters = 0; iters < NB_IT; ++iters) {
+			
+			// Iterate over vertices
+			for (Mesh::Vertex_iterator v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
+			
+				Mesh::Vertex cVertex = *v_it;
 
-					// Initialize variables
-					vv_c = mesh_.vertices(*v_it);
-					if (!vv_c) {
-						continue;
-					}
-					vv_end = vv_c;
-					const Point& refPoint = mesh_.position(*v_it);
-					laplace = 0.0f;
-					numVertices = 0;
-
-					// Iterate over adjacent vertices    
-					do {
-						++numVertices;
-						const Point& vi = mesh_.position(*vv_c);
-						laplace += vi - refPoint;
-					} while (++vv_c != vv_end);
-
-					// Average and normalize the Laplacian
-					laplace /= numVertices;
-
-					//std::cout << "lapl" << laplace << std::endl;
-					//std::cout << "norm" << normals[*v_it] << std::endl;
-					n = normals[*v_it];
-					dotProduct = laplace.x * n.x + laplace.y * n.y + laplace.z * n.z;
-					//std::cout << "u" << u << std::endl;
-
-					n = n * dotProduct / norm(n);
-					laplace = laplace - n;
-					if (norm(laplace) > 100) {
-						++numBig100;
-					}
-					else if (norm(laplace) < 10) {
-						++numSmall10;
-					}
-
-					//std::cout << "refoint" << refPoint << std::endl;
-					//std::cout << "laplace: " << norm(laplace) << std::endl;
-					update[*v_it] = laplace;
-					//break;
+				if (!mesh_.is_boundary(cVertex)) {
+					// Get discrete uniform Laplacian and normal at current vertex
+					Point laplacian = calculateUniformDiscreteLaplacian(cVertex);
+					Point normal = normals[cVertex];
+					// Fill the update property
+					update[cVertex] = laplacian - (dot(laplacian, normal) * normal);
 				}
-
 			}
-			//std::cout << "smooth iterations: " << iters << std::endl;
-			//std::cout << "big100: " << numBig100 << std::endl;
-			//std::cout << "smol10: " << numSmall10 << std::endl;
-			//std::cout << "total: " << norm(laplace) << std::endl;
 
-			for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it)
-				if (!mesh_.is_boundary(*v_it))
+			// Update positions
+			for (Mesh::Vertex_iterator v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
+				if (!mesh_.is_boundary(*v_it)) {
 					mesh_.position(*v_it) += update[*v_it];
+				}
+			}
 		}
 	}
 
