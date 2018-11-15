@@ -122,7 +122,7 @@ namespace mesh_processing {
 					//std::cout << "laplace 2 : " << laplace << std::endl;
 					target_length[*v_it] = target_length[*v_it] + laplace;
 				}
-				
+
 			}
 
 			// rescale desired length
@@ -145,93 +145,54 @@ namespace mesh_processing {
 		}
 	}
 
-	void MeshProcessing::split_long_edges()
-	{
-		Mesh::Edge_iterator     e_it, e_end(mesh_.edges_end());
-		Mesh::Vertex   v0, v1, v;
-		bool            finished;
-		int             i;
-		Point p0, p1, p;
-		float avrgLength, avrgDesired;
-		int nmbrPoints, nmbrSplits, nmbrEgdeUnder;
+	void MeshProcessing::split_long_edges() {
+		
 
+		/* ===============
+			TODO: update the edge set while iterating ok ? If no store all modifs in a vector
+			and update everything at once at the end of the current iteration
+		   =============== */
+
+		// Maximum number of iterations
+		const unsigned int MAX_IT = 100;
+
+		// Get properties
 		Mesh::Vertex_property<Point> normals = mesh_.vertex_property<Point>("v:normal");
 		Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
 
+		for (bool finished = false, unsigned int i = 0; !finished && i < MAX_IT; ++i) {
 
-		for (finished = false, i = 0; !finished && i < 100; ++i)
-		{
+			// Finished is true by default
 			finished = true;
-			// ------------- IMPLEMENT HERE ---------
-			// INSERT CODE:
-			//  Compute the desired length as the mean between the property target_length of two vertices of the edge
-			//  If the edge is longer than 4/3 * desired length
-			//		add the midpoint to the mesh
-			//		set the interpolated normal and interpolated vtargetlength_ property to the vertex
-			//		split the edge with this vertex (use openMesh function split)
-			// Leave the loop running until no splits are done (use the finished variable)
-			// ------------- IMPLEMENT HERE ---------
 
-			Scalar edgeLength;
-			Scalar targetLength;
-			avrgDesired = 0;
-			avrgLength = 0;
-			nmbrPoints = 0;
-			nmbrSplits = 0;
-			nmbrEgdeUnder = 0;
+			// Iterate over edges
+			Mesh::Edge_iterator e_end{ mesh_.edges_end() };
+			for (Mesh::Edge_iterator e_it = mesh_.edges_begin(); e_it != e_end; ++e_it) {
 
-			for (e_it = mesh_.edges_begin(); e_it != e_end; ++e_it)
-			{
+				// Get both endpoints, edge length, and target length
+				Mesh::Vertex v0 = mesh_.vertex(*e_it, 0);
+				Mesh::Vertex v1 = mesh_.vertex(*e_it, 1);
+				Scalar targetLength = (target_length[v0] + target_length[v1]) / 2;
+				Scalar edgeLength = mesh_.edge_length(*e_it);
 
-
-				edgeLength = mesh_.edge_length(*e_it);
-				v0 = mesh_.vertex(*e_it, 0);
-				v1 = mesh_.vertex(*e_it, 1);
-				targetLength = (target_length[v0] + target_length[v1]) / 2;
-
-				
-					avrgLength += edgeLength;
-					avrgDesired += targetLength;
-					++nmbrPoints;
-					if (edgeLength < (04.0f / 3.0f)) {
-						++nmbrEgdeUnder;
-					}
-		
-
+				// Check splitting condition
 				if (edgeLength > ((4.f / 3.f) * targetLength)) {
-					//std::cout << edgeLength << " > " << targetLength << std::endl;
-					++nmbrSplits;
 
+					// Finished is set to false when an edge is splitted
 					finished = false;
 
-					p0 = mesh_.position(v0);
-					p1 = mesh_.position(v1);
-					p = (p0 + p1) / 2;
+					// Create edge midpoint
+					Point p = (mesh_.position(v0) + mesh_.position(v1)) / 2;
+					Mesh::Vertex v = mesh_.add_vertex(p);
 
-					v = mesh_.add_vertex(p);
-					
-					//std::cout << "added vertex" << std::endl;
-
+					// Interpolate normal and target length
 					normals[v] = (normals[v0] + normals[v1]) / 2;
 					target_length[v] = (target_length[v0] + target_length[v1]) / 2;
 
-					//std::cout << "computed normals" << std::endl;
-
-					//mesh_.insert_vertex(*e_it, v);
-					//std::cout << "insert" << std::endl;
+					// Split the edge and update the mesh datastructure
 					mesh_.split(*e_it, v);
-					//std::cout << "split" << std::endl;
 				}
-
 			}
-			//std::cout << "split iterations: " << i << std::endl;
-			//std::cout << "avrg length: " << avrgLength/nmbrPoints << std::endl;
-			//std::cout << "avrg desired: " << avrgDesired/nmbrPoints << std::endl;
-			//std::cout << "avrg cutoff: " << (4.f/3.f)*avrgDesired / nmbrPoints << std::endl;
-			//std::cout << "nmbr splits: " << nmbrSplits << std::endl;
-			//std::cout << "nmbr egde under 4/3: " << nmbrEgdeUnder << std::endl;
-			//std::cout << "nmbr egdes: " << nmbrPoints << std::endl;
-
 		}
 	}
 
@@ -285,10 +246,12 @@ namespace mesh_processing {
 								finished = false;
 								if (mesh_.valence(v0) > mesh_.valence(v1)) {
 									mesh_.collapse(h01);
-								}else {
+								}
+								else {
 									mesh_.collapse(h10);
 								}
-							}else if(b0) {
+							}
+							else if (b0) {
 								finished = false;
 								mesh_.collapse(h01);
 							}
@@ -432,14 +395,14 @@ namespace mesh_processing {
 
 					// Average and normalize the Laplacian
 					laplace /= numVertices;
-					
+
 					//std::cout << "lapl" << laplace << std::endl;
 					//std::cout << "norm" << normals[*v_it] << std::endl;
 					n = normals[*v_it];
 					dotProduct = laplace.x * n.x + laplace.y * n.y + laplace.z * n.z;
 					//std::cout << "u" << u << std::endl;
 
-					n = n * dotProduct/norm(n);
+					n = n * dotProduct / norm(n);
 					laplace = laplace - n;
 					if (norm(laplace) > 100) {
 						++numBig100;
@@ -447,13 +410,13 @@ namespace mesh_processing {
 					else if (norm(laplace) < 10) {
 						++numSmall10;
 					}
-					
+
 					//std::cout << "refoint" << refPoint << std::endl;
 					//std::cout << "laplace: " << norm(laplace) << std::endl;
 					update[*v_it] = laplace;
 					//break;
 				}
-				
+
 			}
 			//std::cout << "smooth iterations: " << iters << std::endl;
 			//std::cout << "big100: " << numBig100 << std::endl;
@@ -575,7 +538,7 @@ namespace mesh_processing {
 	}
 
 	void MeshProcessing::calc_gauss_curvature() {
-		
+
 		Mesh::Vertex_property<Scalar> v_gauss_curvature = mesh_.vertex_property<Scalar>("v:gauss_curvature", 0);
 		Mesh::Vertex_property<Scalar> v_weight = mesh_.vertex_property<Scalar>("v:weight", 0);
 
