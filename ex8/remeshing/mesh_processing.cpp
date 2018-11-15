@@ -159,8 +159,10 @@ namespace mesh_processing {
 		// Get properties
 		Mesh::Vertex_property<Point> normals = mesh_.vertex_property<Point>("v:normal");
 		Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
-
-		for (bool finished = false, unsigned int i = 0; !finished && i < MAX_IT; ++i) {
+		
+		unsigned int i = 0;
+		bool finished = false;
+		for (; !finished && i < MAX_IT; ++i) {
 
 			// Finished is true by default
 			finished = true;
@@ -169,11 +171,13 @@ namespace mesh_processing {
 			Mesh::Edge_iterator e_end{ mesh_.edges_end() };
 			for (Mesh::Edge_iterator e_it = mesh_.edges_begin(); e_it != e_end; ++e_it) {
 
+				Mesh::Edge cEdge = *e_it;
+
 				// Get both endpoints, edge length, and target length
-				Mesh::Vertex v0 = mesh_.vertex(*e_it, 0);
-				Mesh::Vertex v1 = mesh_.vertex(*e_it, 1);
+				Mesh::Vertex v0 = mesh_.vertex(cEdge, 0);
+				Mesh::Vertex v1 = mesh_.vertex(cEdge, 1);
 				Scalar targetLength = (target_length[v0] + target_length[v1]) / 2;
-				Scalar edgeLength = mesh_.edge_length(*e_it);
+				Scalar edgeLength = mesh_.edge_length(cEdge);
 
 				// Check splitting condition
 				if (edgeLength > ((4.f / 3.f) * targetLength)) {
@@ -190,7 +194,7 @@ namespace mesh_processing {
 					target_length[v] = (target_length[v0] + target_length[v1]) / 2;
 
 					// Split the edge and update the mesh datastructure
-					mesh_.split(*e_it, v);
+					mesh_.split(cEdge, v);
 				}
 			}
 		}
