@@ -116,7 +116,48 @@ std::pair<size_t, size_t> get_intervals_borders(float a, float b, float l, float
 	// Use std::pair to return the indices of the first and the last interval border.
 	// ------------- IMPLEMENT HERE ---------
 
+    //cout << "a:" << a <<  " b:" << b <<" l:" << l << " interval_size:" << interval_size << endl;
+
+    if(a < b)
+        intervals_borders = std::pair<size_t,size_t>((l + a)/interval_size, (l + b)/interval_size);
+    else
+        intervals_borders = std::pair<size_t,size_t>((l + a)/interval_size,(l + b)/interval_size);
+
+
 	return intervals_borders;
+}
+
+
+/*	@brief	Computes the coordinates of an interpolated point on a given segment [AB]
+
+	The implementation assumes that point A is taken for reference, meaning that the function
+	will return A when p=0 and B when p=1. In our case A should always be the "outlier" point 
+	in a given triangle, that is the point with a differently signed ISO value than the others.
+
+	@param	a	A point (reference, beginning of segment)
+	@param	b	Another point (end of segment)
+	@param	p	The proportion characterizing the interpolation (in [0,1])
+
+	@return	An interpolated point on segment [AB], at proportion p
+*/
+Point interpolatePoint(Point a, Point b, Scalar p) {
+	return (1 - p) * a + p * b;
+}
+
+/*	@brief	Computes a simple proportion
+
+	The implementation assumes that isoA is taken for reference, meaning that the function
+	will return 0 when isoA=0, whatever isoB's value. In our case isoA should always be the ISO 
+	of the "outlier" point in a given triangle, that is the point with a differently signed 
+	ISO value than the others.
+
+	@param	isoA	An ISO value (reference)
+	@parma	isoB	Another ISO value
+
+	@return	The "proportion" of isoA in (isoA + isoB)
+*/
+Scalar computeProportion(Scalar isoA, Scalar isoB) {
+	return abs(isoA) / (abs(isoA) + abs(isoB));
 }
 
 void MeshProcessing::add_isoline_segment(const std::pair<size_t, size_t> & borders01, const std::pair<size_t, size_t> & borders02,
@@ -129,6 +170,33 @@ void MeshProcessing::add_isoline_segment(const std::pair<size_t, size_t> & borde
 	// Add an isoline segment when the isoline indices for the two edges coincide 
 	// (isolines_points_.push_back(p0); isolines_points_.push_back(p1);)
 	// ------------- IMPLEMENT HERE ---------
+
+    //BEGIN Philippe's code
+
+    int num_intervals_1 = borders01.second - borders01.first;
+    int num_intervals_2 = borders02.second - borders02.first;
+
+    for(int i = borders01.first ; i <= borders01.second ; i++){
+
+        for(int j = borders02.first ; j <= borders02.second ; j++){
+
+            if(i == j){ // same isoline i == j for both
+
+                isolines_points_.push_back(interpolatePoint(v0, v1, 
+                    computeProportion(iso0 + (interval_size/num_intervals_1) * (i-borders01.first)  , iso1)
+                ));
+
+                isolines_points_.push_back(interpolatePoint(v0, v2, 
+                    computeProportion(iso0 + (interval_size/num_intervals_2) * (j-borders02.first), iso2)
+                ));
+
+            } 
+        }
+
+    }
+
+    //END Philippe's code
+    
 
 }
 
