@@ -34,6 +34,7 @@ void MeshProcessing::harmonic_function(const std::vector<size_t> & constraint_in
 
 	calc_weights();
 	auto cotan = mesh_.edge_property<Scalar>("e:weight");
+    auto area_inv = mesh_.vertex_property<Scalar>("v:weight");
 
 	Eigen::SparseMatrix<double> L(n, n);
 	Eigen::MatrixXd rhs(Eigen::MatrixXd::Zero(n, 1));
@@ -45,7 +46,45 @@ void MeshProcessing::harmonic_function(const std::vector<size_t> & constraint_in
 		// Set up Laplace-Beltrami matrix of the mesh
 		// For the vertices for which the constraints are added, replace the corresponding row of the system with the constraint
 		// ------------- IMPLEMENT HERE ---------
-		
+
+        // We fill the Laplace matrix everywhere except at rows = constraints index
+        if(constraint_indices[0] != i and constraint_indices[1] != i){
+
+            Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
+            Mesh::Vertex neighbor_v;
+            Mesh::Edge e;
+
+            Scalar total_cotan_weight = 0.0f;
+
+            Mesh::Vertex actual_v = Mesh::Vertex(i);
+            vh_c = mesh_.halfedges(actual_v);
+
+            vh_end = vh_c;
+
+            do {
+                neighbor_v = mesh_.to_vertex(*vh_c);
+                e = mesh_.edge(*vh_c);
+
+                total_cotan_weight += cotan[e];
+                
+                // component (i,j) of the laplace matrix i != j
+                triplets_L.push_back(Eigen::Triplet<double>(i,neighbor_v.idx(), area_inv[actual_v] * cotan[e]));
+
+            } while(++vh_c != vh_end);
+
+            // diagonal component (i,i) of the laplace matrix
+            triplets_L.push_back(Eigen::Triplet<double>(i,i, area_inv[actual_v] * -total_cotan_weight));
+
+        }else{
+        
+            // if i'th row is a constraint index we set it's ith's component to 1
+            triplets_L.push_back(Eigen::Triplet<double>(i,i, 1.0 ));
+
+            // we also need to set the rhs to one for the second vertex i.e b_j
+            if(i == constraint_indices[1])
+                rhs(i) = 1.0;
+        }
+	
 	}
 
 	L.setFromTriplets(triplets_L.begin(), triplets_L.end());
