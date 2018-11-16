@@ -379,6 +379,18 @@ Viewer::Viewer() : nanogui::Screen(Eigen::Vector2i(1024, 768), "DGP Viewer") {
 		this->refresh_mesh();
 		this->refresh_trackball_center();
 	});
+	b = new Button(popup, "Icosahedron");
+	b->setCallback([this]() {
+		mesh_->load_mesh("../data/icosahedron.obj");
+		this->refresh_mesh();
+		this->refresh_trackball_center();
+	});
+	b = new Button(popup, "Octahedron");
+	b->setCallback([this]() {
+		mesh_->load_mesh("../data/octahedron.obj");
+		this->refresh_mesh();
+		this->refresh_trackball_center();
+	});
 
 	b = new Button(popup, "Open mesh ...");
 	b->setCallback([this]() {
