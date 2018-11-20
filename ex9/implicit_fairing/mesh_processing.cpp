@@ -14,6 +14,7 @@
 #include <set>
 #include <map>
 
+// Custom macros
 #define MIN(x,y) ( ( (x) < (y) ) ? (x) : (y) )
 #define MAX(x,y) ( ( (x) < (y) ) ? (y) : (x) )
 
@@ -110,9 +111,16 @@ void MeshProcessing::harmonic_function(const std::vector<size_t> & constraint_in
 }
 
 std::pair<size_t, size_t> get_intervals_borders(float a, float b, float l, float interval_size) {
-    size_t itA = static_cast<size_t>((l + a)/interval_size);
-    size_t itB = static_cast<size_t>((l + b)/interval_size);
-    return (a < b) ? std::pair<size_t,size_t>(a, b) : std::pair<size_t,size_t>(b, a);
+
+    if (a < b) {
+        size_t itA = static_cast<size_t>((l + a)/interval_size);
+        size_t itB = static_cast<size_t>((l + b)/interval_size - 1);
+        return std::pair<size_t,size_t>(itA, itB);
+    } else {
+        size_t itA = static_cast<size_t>((l + a)/interval_size - 1);
+        size_t itB = static_cast<size_t>((l + b)/interval_size);
+        return std::pair<size_t,size_t>(itB, itA);
+    }
 }
 
 
@@ -135,46 +143,40 @@ Point interpolatePoint(Point a, Point b, Scalar p) {
 
 	@return	The "proportion" of isoA in (isoA + isoB)
 */
-Scalar computeProportion(size_t interval_index, float interval_size, Scalar isoRef, Scalar isoEnd) {
-	return (((interval_index + 1) * interval_size) - isoRef) / (isoRef - isoEnd);
+Scalar computeProportion(float l, size_t interval_index, float interval_size, Scalar isoRef, Scalar isoEnd) {
+	return (l + ((interval_index + 1) * interval_size) - isoRef) / (isoEnd - isoRef);
 }
 
 void MeshProcessing::add_isoline_segment(const std::pair<size_t, size_t> & borders01, const std::pair<size_t, size_t> & borders02,
 	const float & iso0, const float & iso1, const float & iso2, const Point & v0, const Point & v1, const Point & v2,
 	float l, float interval_size) {
 
-	// ------------- IMPLEMENT HERE ---------
-	// For each two edges of a triangle check if they are intersected by the same isoline. 
-	// If this is the case, compute the intersections using linear interpolation of the isovalues.
-	// Add an isoline segment when the isoline indices for the two edges coincide 
-	// (isolines_points_.push_back(p0); isolines_points_.push_back(p1);)
-	// ------------- IMPLEMENT HERE ---------
+    if (borders01.first > borders01.second || borders02.first > borders02.second) return;
 
-
-	size_t firstInterval = MAX(borders01.first,borders02.first);
+	size_t firstInterval = MAX(borders01.first, borders02.first);
 	size_t lastInterval = MIN(borders01.second, borders02.second);
 
     for(size_t interval = firstInterval; interval <= lastInterval; ++interval){
 
-		// border01
-		if (iso0 < iso1) {
-			Scalar prop = computeProportion(interval, interval_size, iso0, iso1);
-			isolines_points_.push_back(interpolatePoint(v0, v1, prop));
-		}
-		else {
-			Scalar prop = computeProportion(interval, interval_size, iso1, iso0);
-			isolines_points_.push_back(interpolatePoint(v1, v0, prop));
-		}
+        // border01
+        if (iso0 < iso1) {
+            Scalar prop = computeProportion(l, interval, interval_size, iso0, iso1);
+            isolines_points_.push_back(interpolatePoint(v0, v1, prop));
+        }
+        else {
+            Scalar prop = computeProportion(l, interval, interval_size, iso1, iso0);
+            isolines_points_.push_back(interpolatePoint(v1, v0, prop));
+        }
 
-		// border02
-		if (iso0 < iso2) {
-			Scalar prop = computeProportion(interval, interval_size, iso0, iso2);
-			isolines_points_.push_back(interpolatePoint(v0, v2, prop));
-		}
-		else {
-			Scalar prop = computeProportion(interval, interval_size, iso2, iso0);
-			isolines_points_.push_back(interpolatePoint(v2, v0, prop));
-		}
+        // border02
+        if (iso0 < iso2) {
+            Scalar prop = computeProportion(l, interval, interval_size, iso0, iso2);
+            isolines_points_.push_back(interpolatePoint(v0, v2, prop));
+        }
+        else {
+            Scalar prop = computeProportion(l, interval, interval_size, iso2, iso0);
+            isolines_points_.push_back(interpolatePoint(v2, v0, prop));
+        }
     }
 }
 
