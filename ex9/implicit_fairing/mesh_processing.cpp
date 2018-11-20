@@ -107,24 +107,9 @@ void MeshProcessing::harmonic_function(const std::vector<size_t> & constraint_in
 }
 
 std::pair<size_t, size_t> get_intervals_borders(float a, float b, float l, float interval_size) {
-
-	std::pair<size_t, size_t> intervals_borders;
-
-	// ------------- IMPLEMENT HERE ---------
-	// Given the values of the harmonic function that correspond to the two vertices in a triangle,
-	// find the first and the last interval border that fall between the isovalues at the two vertices
-	// Use std::pair to return the indices of the first and the last interval border.
-	// ------------- IMPLEMENT HERE ---------
-
-    //cout << "a:" << a <<  " b:" << b <<" l:" << l << " interval_size:" << interval_size << endl;
-
-    if(a < b)
-        intervals_borders = std::pair<size_t,size_t>((l + a)/interval_size, (l + b)/interval_size);
-    else
-        intervals_borders = std::pair<size_t,size_t>((l + a)/interval_size,(l + b)/interval_size);
-
-
-	return intervals_borders;
+    size_t itA = static_cast<size_t>((l + a)/interval_size);
+    size_t itB = static_cast<size_t>((l + b)/interval_size);
+    return (a < b) ? std::pair<size_t,size_t>(a, b) : std::pair<size_t,size_t>(b, a);
 }
 
 
@@ -573,8 +558,7 @@ void MeshProcessing::color_coding(Mesh::Vertex_property<Scalar> prop, Mesh *mesh
 }
 
 void MeshProcessing::set_color(Mesh::Vertex v, const Color& col,
-               Mesh::Vertex_property<Color> color_prop)
-{
+               Mesh::Vertex_property<Color> color_prop) {
     color_prop[v] = col;
 }
 
