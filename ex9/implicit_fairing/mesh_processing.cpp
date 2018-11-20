@@ -14,6 +14,9 @@
 #include <set>
 #include <map>
 
+#define MIN(x,y) ( ( (x) < (y) ) ? (x) : (y) )
+#define MAX(x,y) ( ( (x) < (y) ) ? (y) : (x) )
+
 namespace mesh_processing {
 
 using surface_mesh::Point;
@@ -48,7 +51,7 @@ void MeshProcessing::harmonic_function(const std::vector<size_t> & constraint_in
 		// ------------- IMPLEMENT HERE ---------
 
         // We fill the Laplace matrix everywhere except at rows = constraints index
-        if(constraint_indices[0] != i and constraint_indices[1] != i){
+        if(constraint_indices[0] != i && constraint_indices[1] != i){
 
             Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
             Mesh::Vertex neighbor_v;
@@ -115,10 +118,6 @@ std::pair<size_t, size_t> get_intervals_borders(float a, float b, float l, float
 
 /*	@brief	Computes the coordinates of an interpolated point on a given segment [AB]
 
-	The implementation assumes that point A is taken for reference, meaning that the function
-	will return A when p=0 and B when p=1. In our case A should always be the "outlier" point 
-	in a given triangle, that is the point with a differently signed ISO value than the others.
-
 	@param	a	A point (reference, beginning of segment)
 	@param	b	Another point (end of segment)
 	@param	p	The proportion characterizing the interpolation (in [0,1])
@@ -131,18 +130,13 @@ Point interpolatePoint(Point a, Point b, Scalar p) {
 
 /*	@brief	Computes a simple proportion
 
-	The implementation assumes that isoA is taken for reference, meaning that the function
-	will return 0 when isoA=0, whatever isoB's value. In our case isoA should always be the ISO 
-	of the "outlier" point in a given triangle, that is the point with a differently signed 
-	ISO value than the others.
-
-	@param	isoA	An ISO value (reference)
-	@parma	isoB	Another ISO value
+	@param	isoRef	An ISO value (reference)
+	@parma	isoEnd	Another ISO value
 
 	@return	The "proportion" of isoA in (isoA + isoB)
 */
-Scalar computeProportion(Scalar isoA, Scalar isoB) {
-	return abs(isoA) / (abs(isoA) + abs(isoB));
+Scalar computeProportion(size_t interval_index, float interval_size, Scalar isoRef, Scalar isoEnd) {
+	return (((interval_index + 1) * interval_size) - isoRef) / (isoRef - isoEnd);
 }
 
 void MeshProcessing::add_isoline_segment(const std::pair<size_t, size_t> & borders01, const std::pair<size_t, size_t> & borders02,
@@ -156,33 +150,32 @@ void MeshProcessing::add_isoline_segment(const std::pair<size_t, size_t> & borde
 	// (isolines_points_.push_back(p0); isolines_points_.push_back(p1);)
 	// ------------- IMPLEMENT HERE ---------
 
-    //BEGIN Philippe's code
 
-    int num_intervals_1 = borders01.second - borders01.first;
-    int num_intervals_2 = borders02.second - borders02.first;
+	size_t firstInterval = MAX(borders01.first,borders02.first);
+	size_t lastInterval = MIN(borders01.second, borders02.second);
 
-    for(int i = borders01.first ; i <= borders01.second ; i++){
+    for(size_t interval = firstInterval; interval <= lastInterval; ++interval){
 
-        for(int j = borders02.first ; j <= borders02.second ; j++){
+		// border01
+		if (iso0 < iso1) {
+			Scalar prop = computeProportion(interval, interval_size, iso0, iso1);
+			isolines_points_.push_back(interpolatePoint(v0, v1, prop));
+		}
+		else {
+			Scalar prop = computeProportion(interval, interval_size, iso1, iso0);
+			isolines_points_.push_back(interpolatePoint(v1, v0, prop));
+		}
 
-            if(i == j){ // same isoline i == j for both
-
-                isolines_points_.push_back(interpolatePoint(v0, v1, 
-                    computeProportion(iso0 + (interval_size/num_intervals_1) * (i-borders01.first)  , iso1)
-                ));
-
-                isolines_points_.push_back(interpolatePoint(v0, v2, 
-                    computeProportion(iso0 + (interval_size/num_intervals_2) * (j-borders02.first), iso2)
-                ));
-
-            } 
-        }
-
+		// border02
+		if (iso0 < iso2) {
+			Scalar prop = computeProportion(interval, interval_size, iso0, iso2);
+			isolines_points_.push_back(interpolatePoint(v0, v2, prop));
+		}
+		else {
+			Scalar prop = computeProportion(interval, interval_size, iso2, iso0);
+			isolines_points_.push_back(interpolatePoint(v2, v0, prop));
+		}
     }
-
-    //END Philippe's code
-    
-
 }
 
 void MeshProcessing::compute_isolines(const std::vector<size_t> & constraint_indices, string property_name, size_t num_intervals) {
