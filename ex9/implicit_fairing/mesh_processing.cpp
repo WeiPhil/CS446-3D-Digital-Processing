@@ -34,8 +34,10 @@ MeshProcessing::MeshProcessing(const string& filename) {
 
 void MeshProcessing::harmonic_function(const std::vector<size_t> & constraint_indices, string property_name) {
 
-	const int n = mesh_.n_vertices();
+	// Number of vertices
+	const unsigned int n = mesh_.n_vertices();
 
+	// Compute weights and get properties
 	calc_weights();
 	auto cotan = mesh_.edge_property<Scalar>("e:weight");
     auto area_inv = mesh_.vertex_property<Scalar>("v:weight");
@@ -44,49 +46,41 @@ void MeshProcessing::harmonic_function(const std::vector<size_t> & constraint_in
 	Eigen::MatrixXd rhs(Eigen::MatrixXd::Zero(n, 1));
 	std::vector< Eigen::Triplet<double> > triplets_L;
 
-	for (int i = 0; i < n; ++i) {
+	for (size_t i = 0; i < n; ++i) {
 
-		// ------------- IMPLEMENT HERE ---------
-		// Set up Laplace-Beltrami matrix of the mesh
-		// For the vertices for which the constraints are added, replace the corresponding row of the system with the constraint
-		// ------------- IMPLEMENT HERE ---------
-
-        // We fill the Laplace matrix everywhere except at rows = constraints index
+        // We fill the Laplace matrix everywhere except at rows corresponding to constraints index
         if(constraint_indices[0] != i && constraint_indices[1] != i){
 
-            Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
-            Mesh::Vertex neighbor_v;
-            Mesh::Edge e;
-
             Scalar total_cotan_weight = 0.0f;
-
             Mesh::Vertex actual_v = Mesh::Vertex(i);
-            vh_c = mesh_.halfedges(actual_v);
 
-            vh_end = vh_c;
+			// Get circulator
+			Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(actual_v);
+			Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
 
+			// Iterate over neighbors
             do {
-                neighbor_v = mesh_.to_vertex(*vh_c);
-                e = mesh_.edge(*vh_c);
-
+				Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
+				Mesh::Edge e = mesh_.edge(*vh_c);
                 total_cotan_weight += cotan[e];
                 
-                // component (i,j) of the laplace matrix i != j
+                // Component (i,j) of the laplace matrix i != j
                 triplets_L.push_back(Eigen::Triplet<double>(i,neighbor_v.idx(), area_inv[actual_v] * cotan[e]));
 
             } while(++vh_c != vh_end);
 
-            // diagonal component (i,i) of the laplace matrix
+            // Diagonal component (i,i) of the laplace matrix
             triplets_L.push_back(Eigen::Triplet<double>(i,i, area_inv[actual_v] * -total_cotan_weight));
 
         }else{
         
-            // if i'th row is a constraint index we set it's ith's component to 1
+            // If i'th row is a constraint index we set it's ith's component to 1
             triplets_L.push_back(Eigen::Triplet<double>(i,i, 1.0 ));
 
-            // we also need to set the rhs to one for the second vertex i.e b_j
-            if(i == constraint_indices[1])
-                rhs(i) = 1.0;
+            // We also need to set the rhs to one for the second vertex i.e b_j
+			if (i == constraint_indices[1]) {
+				rhs(i) = 1.0;
+			}
         }
 	
 	}
@@ -111,37 +105,32 @@ void MeshProcessing::harmonic_function(const std::vector<size_t> & constraint_in
 }
 
 std::pair<size_t, size_t> get_intervals_borders(float a, float b, float l, float interval_size) {
-
-    if (a < b) {
-        size_t itA = static_cast<size_t>((l + a)/interval_size);
-        size_t itB = static_cast<size_t>((l + b)/interval_size - 1);
-        return std::pair<size_t,size_t>(itA, itB);
-    } else {
-        size_t itA = static_cast<size_t>((l + a)/interval_size - 1);
-        size_t itB = static_cast<size_t>((l + b)/interval_size);
-        return std::pair<size_t,size_t>(itB, itA);
-    }
+	return (a < b)
+		? std::pair<size_t, size_t>(static_cast<size_t>((l + a) / interval_size), static_cast<size_t>((l + b) / interval_size - 1))
+		: std::pair<size_t, size_t>(static_cast<size_t>((l + b) / interval_size), static_cast<size_t>((l + a) / interval_size - 1));
 }
 
-
-/*	@brief	Computes the coordinates of an interpolated point on a given segment [AB]
+/*	@brief	Computes the coordinates of an interpolated point on a given segment [AB].
 
 	@param	a	A point (reference, beginning of segment)
 	@param	b	Another point (end of segment)
 	@param	p	The proportion characterizing the interpolation (in [0,1])
 
-	@return	An interpolated point on segment [AB], at proportion p
+	@return	An interpolated point on segment [AB], at proportion p.
 */
 Point interpolatePoint(Point a, Point b, Scalar p) {
 	return (1 - p) * a + p * b;
 }
 
-/*	@brief	Computes a simple proportion
+/*	@brief	Interpolates an isoline on a given "ISO segment".
 
-	@param	isoRef	An ISO value (reference)
-	@parma	isoEnd	Another ISO value
+	@param	l				The ISO base value
+	@param	interval_index	An isoline border index
+	@param	interval_size	The size of an ISO interval
+	@param	isoRef			An ISO value (reference)
+	@parma	isoEnd			Another ISO value
 
-	@return	The "proportion" of isoA in (isoA + isoB)
+	@return The proportion corresponding to the interpolation of an isoline on a given "ISO segment" (in [0, 1]). 
 */
 Scalar computeProportion(float l, size_t interval_index, float interval_size, Scalar isoRef, Scalar isoEnd) {
 	return (l + ((interval_index + 1) * interval_size) - isoRef) / (isoEnd - isoRef);
@@ -151,32 +140,25 @@ void MeshProcessing::add_isoline_segment(const std::pair<size_t, size_t> & borde
 	const float & iso0, const float & iso1, const float & iso2, const Point & v0, const Point & v1, const Point & v2,
 	float l, float interval_size) {
 
+	// If one of the segment isn't crossed by any isoline return immediatly
     if (borders01.first > borders01.second || borders02.first > borders02.second) return;
 
+	// Get set of isolines crossed by both segment
 	size_t firstInterval = MAX(borders01.first, borders02.first);
 	size_t lastInterval = MIN(borders01.second, borders02.second);
 
+	// Iterate over common isolines
     for(size_t interval = firstInterval; interval <= lastInterval; ++interval){
 
-        // border01
-        if (iso0 < iso1) {
-            Scalar prop = computeProportion(l, interval, interval_size, iso0, iso1);
-            isolines_points_.push_back(interpolatePoint(v0, v1, prop));
-        }
-        else {
-            Scalar prop = computeProportion(l, interval, interval_size, iso1, iso0);
-            isolines_points_.push_back(interpolatePoint(v1, v0, prop));
-        }
-
-        // border02
-        if (iso0 < iso2) {
-            Scalar prop = computeProportion(l, interval, interval_size, iso0, iso2);
-            isolines_points_.push_back(interpolatePoint(v0, v2, prop));
-        }
-        else {
-            Scalar prop = computeProportion(l, interval, interval_size, iso2, iso0);
-            isolines_points_.push_back(interpolatePoint(v2, v0, prop));
-        }
+		// Interpolate point on borders01
+		(iso0 < iso1)
+			? isolines_points_.push_back(interpolatePoint(v0, v1, computeProportion(l, interval, interval_size, iso0, iso1)))
+			: isolines_points_.push_back(interpolatePoint(v1, v0, computeProportion(l, interval, interval_size, iso1, iso0)));
+		
+		// Interpolate point on borders02
+        (iso0 < iso2)
+            ? isolines_points_.push_back(interpolatePoint(v0, v2, computeProportion(l, interval, interval_size, iso0, iso2)))
+            : isolines_points_.push_back(interpolatePoint(v2, v0, computeProportion(l, interval, interval_size, iso2, iso0)));
     }
 }
 
