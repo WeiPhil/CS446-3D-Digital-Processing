@@ -50,9 +50,63 @@ void MeshProcessing::map_suface_boundary_to_circle()
 
     Mesh::Vertex_property<Vec2d> v_texture = mesh_.vertex_property<Vec2d>("v:texture", Vec2d(0.0));
     int n_vertices = mesh_.n_vertices();
-    //Homework starting from here
-
     
+	//Homework starting from here
+	
+	// Accumulate total boundary edge length here
+	double acc_length = 0.f;
+	std::vector<double> boundary_edge_lengths;
+
+	for (auto v : mesh_.vertices()) {
+
+		if (mesh_.is_boundary(v)) { // Found a boundary vertex
+			
+			// starting_halfedge is guaranteed to be a boundary halfedge
+			Mesh::Halfedge starting_halfedge = mesh_.halfedge(v);
+			Mesh::Halfedge current_halfedge = starting_halfedge;
+			
+			// Now iterates over the surface boundary
+			do {
+				// Get current edge and its endpoints
+				Mesh::Edge current_edge = mesh_.edge(current_halfedge);
+				Mesh::Vertex start_point = mesh_.vertex(current_edge, 0);
+				Mesh::Vertex end_point = mesh_.vertex(current_edge, 1);
+
+				// Accumulate edge length
+				Point pos = mesh_.position(end_point) - mesh_.position(start_point);
+				acc_length += sqrt(pos.x * pos.x + pos.y * pos.y + pos.z * pos.z);
+				boundary_edge_lengths.push_back(acc_length);
+
+				// Get the next halfedge
+				current_halfedge = mesh_.halfedge(end_point);
+
+			} while (current_halfedge != starting_halfedge);
+
+			// We now have the total boundary length, re-iterate over the boundary
+			size_t i = 0;
+			Vec2d circle_center{ 0.5, 0.5 };
+			do {
+				// Get current edge and its endpoints
+				Mesh::Edge current_edge = mesh_.edge(current_halfedge);
+				Mesh::Vertex start_point = mesh_.vertex(current_edge, 0);
+				Mesh::Vertex end_point = mesh_.vertex(current_edge, 1);
+
+				// angle is in [0, 2 * PI] (radian angle on circle)
+				double angle = (2 * EIGEN_PI ) * (boundary_edge_lengths[i] / acc_length);
+
+				// Get corresponding point on cirle
+				v_texture[start_point] = circle_center + 0.5 * Vec2d{ cos(angle), sin(angle) };
+
+				// Get the next halfedge
+				current_halfedge = mesh_.halfedge(end_point);
+				i++;
+
+			} while (current_halfedge != starting_halfedge);
+
+			// Stop the loop
+			break;
+		}
+	}
 
     //Homework stopping from here
 
