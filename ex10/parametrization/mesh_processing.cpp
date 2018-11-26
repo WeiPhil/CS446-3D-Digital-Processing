@@ -130,24 +130,70 @@ void MeshProcessing::map_suface_boundary_to_circle()
 // ========================================================================
 void MeshProcessing::iterative_solve_textures(int item_times)
 {
-    int n_vertices = mesh_.n_vertices();
-    Mesh::Vertex_property<Vec2d> v_texture = mesh_.vertex_property<Vec2d>("v:texture", Vec2d(0.5, 0.5));
+	for (int i = 0; i < 10; i++) {
 
-    //Homework starting from here
+		int n_vertices = mesh_.n_vertices();
+		Mesh::Vertex_property<Vec2d> v_texture = mesh_.vertex_property<Vec2d>("v:texture", Vec2d(0.5, 0.5));
+		calc_weights();
+		Mesh::Vertex_property<Vec2d> v_newTexture = mesh_.vertex_property<Vec2d>("v:newtexture", Vec2d(0.5, 0.5));
+		calc_weights();
+		Mesh::Edge_property<Scalar> e_weight = mesh_.edge_property<Scalar>("e:weight", 0.0f);
 
-	// iterate over all vertices
-	for (auto v : mesh_.vertices()) {
+		//Homework starting from here
+
+		// iterate over all vertices
+
+		for (auto v : mesh_.vertices()) {
+
+			// if vertex is boundary we do not want to move it in the texture
+			if (!mesh_.is_boundary(v)) {
+				//i initialize variables
+				Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
+				if (!vh_c) {
+					v_newTexture[v] = 0.f;
+					continue;
+				}
+
+				Vec2d acc_solve(0.0);
+				Scalar total_weights = 0.f;
+				Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
+
+				// Iterate over adjacent vertices
+				do {
+					Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
+					Mesh::Edge e = mesh_.edge(*vh_c);
+
+					//multiply current texture poistion by the edge weight IJ
+					acc_solve += e_weight[e] * (v_texture[neighbor_v]);
+					// sum all weights IJ 
+					total_weights += e_weight[e];
+
+				} while (++vh_c != vh_end);
+
+				// update new texture value
+				v_newTexture[v] = (1.0f / total_weights) * acc_solve;
+			}
+			else {
+				// update new texture value
+				v_newTexture[v] = v_texture[v];
+			}
+		}
+
+		// update texture property with new values
+		for (auto v2 : mesh_.vertices()) {
+			v_texture[v2] = v_newTexture[v2];
+		}
+
+		//Homework stopping from here
+		//Update the texture matrix
+		texture_ = Eigen::MatrixXf(2, n_vertices);
+		int j = 0;
+		for (auto v : mesh_.vertices()) {
+			texture_.col(j) << v_texture[v][0], v_texture[v][1];
+			j++;
+		}
 
 	}
-   
-    //Homework stopping from here
-    //Update the texture matrix
-    texture_ = Eigen::MatrixXf(2, n_vertices);
-    int j = 0;
-    for (auto v: mesh_.vertices()) {
-        texture_.col(j) << v_texture[v][0], v_texture[v][1];
-        j++;
-    }
 }
 // ======================================================================
 // EXERCISE 1.3 Direct Solve Textures
