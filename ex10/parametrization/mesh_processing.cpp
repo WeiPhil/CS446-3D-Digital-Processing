@@ -56,12 +56,13 @@ void MeshProcessing::map_suface_boundary_to_circle()
 	// Accumulate total boundary edge length here
 	double acc_length = 0.f;
 	std::vector<double> boundary_edge_lengths;
-	bool hasMappedBoundary = false;
+	bool has_mapped_boundary = false;
+    Vec2d circle_center{ 0.5, 0.5 };
 
 	for (auto v : mesh_.vertices()) {
 
 		if (mesh_.is_boundary(v)) { // Found a boundary vertex
-			if (!hasMappedBoundary) { // havent mapped all boundary vertices yet
+			if (!has_mapped_boundary) { // Execute this part only once
 
 				// starting_halfedge is guaranteed to be a boundary halfedge
 				Mesh::Halfedge starting_halfedge = mesh_.halfedge(v);
@@ -86,7 +87,6 @@ void MeshProcessing::map_suface_boundary_to_circle()
 
 				// We now have the total boundary length, re-iterate over the boundary
 				size_t i = 0;
-				Vec2d circle_center{ 0.5, 0.5 };
 				do {
 					// Get current edge and its endpoints
 					Mesh::Edge current_edge = mesh_.edge(current_halfedge);
@@ -105,12 +105,11 @@ void MeshProcessing::map_suface_boundary_to_circle()
 
 				} while (current_halfedge != starting_halfedge);
 
-				// Do not remap all boundaries all the time
-				hasMappedBoundary = true;
+				// Map the boundary once
+				has_mapped_boundary = true;
 			}
 		} else {
-			//set every other vertice to the center of the circle
-			Vec2d circle_center{ 0.5, 0.5 };
+			// Every interior vertix goes to circle center
 			v_texture[v] = circle_center;
 		}
 	}
