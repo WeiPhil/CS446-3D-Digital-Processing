@@ -10,6 +10,7 @@
 //         EPF Lausanne
 //
 //-----------------------------------------------------------------------------
+#define _USE_MATH_DEFINES
 #include "viewer.h"
 #define IMAGE_ROWS 128      // Texture image rows and columns
 #define IMAGE_COLS 128
