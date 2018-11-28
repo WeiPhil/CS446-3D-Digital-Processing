@@ -50,22 +50,19 @@ void MeshProcessing::map_suface_boundary_to_circle()
 
     Mesh::Vertex_property<Vec2d> v_texture = mesh_.vertex_property<Vec2d>("v:texture", Vec2d(0.0));
     int n_vertices = mesh_.n_vertices();
-
-    //Homework starting from here
-
-    // Accumulate total boundary edge length here
-    double acc_length = 0.f;
-    std::vector<double> boundary_edge_lengths;
     bool has_mapped_boundary = false;
     Vec2d circle_center{0.5, 0.5};
 
     for (auto v : mesh_.vertices())
     {
-
         if (mesh_.is_boundary(v))
         { // Found a boundary vertex
             if (!has_mapped_boundary)
             { // Execute this part only once
+
+				// Accumulator for total boundary edge length
+				double acc_length = 0.f;
+				std::vector<double> boundary_edge_lengths;
 
                 // starting_halfedge is guaranteed to be a boundary halfedge
                 Mesh::Halfedge starting_halfedge = mesh_.halfedge(v);
@@ -121,7 +118,6 @@ void MeshProcessing::map_suface_boundary_to_circle()
         }
     }
 
-    //Homework stopping from here
     //Update the texture matrix
     texture_ = Eigen::MatrixXf(2, n_vertices);
     int j = 0;
@@ -137,60 +133,75 @@ void MeshProcessing::map_suface_boundary_to_circle()
 // ========================================================================
 void MeshProcessing::iterative_solve_textures(int item_times)
 {
-    int n_vertices = mesh_.n_vertices();
     Mesh::Vertex_property<Vec2d> v_texture = mesh_.vertex_property<Vec2d>("v:texture", Vec2d(0.5, 0.5));
+	Mesh::Edge_property<Scalar> e_weight = mesh_.edge_property<Scalar>("e:weight", 0.0f);
+	int n_vertices = mesh_.n_vertices();
+	
+	// Create temporary property
+	Mesh::Vertex_property<Vec2d> v_texture_tmp = mesh_.add_vertex_property<Vec2d>("v:texture_tmp");
 
-    //Homework starting from here
+	// Repeat the procedure item_times
+	for (size_t i = 0; i < item_times; ++i) 
+	{	
+		// For all vertices
+		for (auto v : mesh_.vertices())
+		{
+			// For non-boundary vertices
+			if (!mesh_.is_boundary(v))
+			{
+				// Get one-ring circulator
+				Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
+				Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
+				if (!vh_c)
+				{
+					continue;
+				}
 
-    Mesh::Edge_property<Scalar> e_weight =
-        mesh_.edge_property<Scalar>("e:weight", 0.0f);
+				// Stores pairs of cotan weight and neighbor vertex texture
+				std::vector<std::pair<Scalar, Vec2d>> cotan_weights_tex_pair;
 
-    Mesh::Halfedge_around_vertex_circulator vh_c, vh_end;
+				// Accumulator for total cotan weights
+				Scalar acc_cotan_weight = 0.f;
 
-    for (auto v : mesh_.vertices())
-    {
-        //for non-boundary vertices
-        if (!mesh_.is_boundary(v))
-        {
+				// Iterate over neighboring vertices
+				do
+				{
+					Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
+					Mesh::Edge e = mesh_.edge(*vh_c);
+					acc_cotan_weight += e_weight[e];
+					cotan_weights_tex_pair.push_back(std::pair<Scalar, Vec2d>(e_weight[e], v_texture[neighbor_v]));
 
-            vh_c = mesh_.halfedges(v);
-            if (!vh_c)
-            {
-                continue;
-            }
-            vh_end = vh_c;
+				} while (++vh_c != vh_end);
 
-            std::vector<std::pair<Scalar, Vec2d>> cotan_weightsTex;
+				// Accumulate texture value over all adjacent faces
+				Vec2d acc_new_texture(0.0f);
 
-            Scalar tot_cotan_weight = 0.f;
-            // we calculate the non-normalized cotan weight and store them with the corresponding neighboor texture
-            do
-            {
-                Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
-                Mesh::Edge e = mesh_.edge(*vh_c);
-                tot_cotan_weight += e_weight[e];
-                cotan_weightsTex.push_back(std::pair<Scalar, Vec2d>(e_weight[e], v_texture[neighbor_v]));
+				// Normalize the cotan weights and accumulate new texture value
+				for (auto pair : cotan_weights_tex_pair)
+				{
+					acc_new_texture += (pair.first / acc_cotan_weight) * pair.second;
+				}
 
-            } while (++vh_c != vh_end);
+				// Update texture in temporary property
+				v_texture_tmp[v] = acc_new_texture;
+			}
+		}
 
-            vh_c = mesh_.halfedges(v);
+		// Update texture values in v_texture
+		for (auto v : mesh_.vertices())
+		{
+			// For non-boundary vertices
+			if (!mesh_.is_boundary(v))
+			{
+				v_texture[v] = v_texture_tmp[v];
+			}
+		}
+	}
 
-            Scalar cotan_weight = 0.f;
-            Vec2d newTexCoord(0.0f);
-            // Now we noramlize the cotan weights and calculate the new texture coordinates
-            for (auto pair : cotan_weightsTex)
-            {
-                Scalar normalizedWeight = pair.first / tot_cotan_weight;
-                newTexCoord += normalizedWeight * pair.second;
-                cotan_weight += normalizedWeight;
-            }
+	// Remove temporary property
+	mesh_.remove_vertex_property(v_texture_tmp);
 
-            v_texture[v] = newTexCoord / cotan_weight;
-        }
-    }
-
-    //Homework stopping from here
-    //Update the texture matrix
+    // Update the texture matrix
     texture_ = Eigen::MatrixXf(2, n_vertices);
     int j = 0;
     for (auto v : mesh_.vertices())
