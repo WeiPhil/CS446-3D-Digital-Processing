@@ -317,6 +317,113 @@ void MeshProcessing::direct_solve_textures()
 // ======================================================================
 void MeshProcessing::minimal_surface()
 {
+	int n_vertices = mesh_.n_vertices();
+	//Homework starting from here
+
+	// setup
+	auto cotan = mesh_.edge_property<Scalar>("e:weight");
+	auto area_inv = mesh_.vertex_property<Scalar>("v:weight");
+
+	// Variable to store vertices and their position in the matrix
+	std::map<Mesh::Vertex, int> boundaries;
+	std::map<Mesh::Vertex, int> non_boundaries;
+
+	// Storing vertices and their positions in the matrix
+	int n = 0, m = 0;
+	for (auto v : mesh_.vertices())
+	{
+		if (!mesh_.is_boundary(v))
+		{
+			non_boundaries.emplace(v, n);
+			n++;
+		}
+		else
+		{
+			boundaries.emplace(v, m);
+			m++;
+		}
+	}
+
+	// Setting up matrices to compute solution
+	Eigen::SparseMatrix<double> minusM(n + m, n + m);
+	Eigen::MatrixXd minusB(Eigen::MatrixXd::Zero(n + m, 3));
+	std::vector<Eigen::Triplet<double>> triplets_minusM;
+
+	// Filling matrices with boundary vertices
+	for (auto v : boundaries) {
+		minusB(v.second, 0) = mesh_.position(v.first)[0];
+		minusB(v.second, 1) = mesh_.position(v.first)[1];
+		minusB(v.second, 2) = mesh_.position(v.first)[2];
+		triplets_minusM.push_back(Eigen::Triplet<double>(v.second, v.second, 1.0));
+	}
+
+	// Filling matrices with non boundary vetices
+	for (auto v : non_boundaries)
+	{
+		// Storing cotan weights
+		Vec3d zero_vector_boundary_condition(0.0f);
+		Scalar total_cotan_weight = 0.0f;
+
+		// Get circulator
+		Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v.first);
+		Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
+
+		// Iterate over neighbors for each non-boundary vertex
+		do
+		{
+			Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
+			Mesh::Edge e = mesh_.edge(*vh_c);
+			// i != j , j belongs to neighborhood and vj is non-boundary
+			if (!mesh_.is_boundary(neighbor_v))
+			{
+				// Cotan Laplacian
+				total_cotan_weight += cotan[e];
+				triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, non_boundaries.at(neighbor_v) + m, cotan[e]));
+
+				// Uniform Laplacian
+				//total_cotan_weight += 1.0;
+				//triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, non_boundaries.at(neighbor_v) + m, 1.0));
+			}
+			else // i != j , j belongs to neighborhood and vj is boundary
+			{
+				// Cotan laplacian
+				total_cotan_weight += cotan[e];
+				triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, boundaries.at(neighbor_v), cotan[e]));
+
+				// Uniform Laplacian
+				//total_cotan_weight += 1.0;
+				//triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, boundaries.at(neighbor_v) + m, 1.0));
+			}
+		} while (++vh_c != vh_end);
+
+		triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, v.second + m, -total_cotan_weight));
+
+		// Setting - bi
+		minusB(v.second + m, 0) = zero_vector_boundary_condition[0];
+		minusB(v.second + m, 1) = zero_vector_boundary_condition[1];
+		minusB(v.second + m, 2) = zero_vector_boundary_condition[2];
+	}
+
+	// Setting up L
+	minusM.setFromTriplets(triplets_minusM.begin(), triplets_minusM.end());
+
+	// Solving for solution
+	Eigen::SparseLU<Eigen::SparseMatrix<double>> solver(minusM);
+	if (solver.info() != Eigen::Success)
+	{
+		printf("linear solver init failed.\n");
+	}
+	Eigen::MatrixXd X = solver.solve(minusB);
+	if (solver.info() != Eigen::Success)
+	{
+		printf("linear solver failed.\n");
+	}
+
+	// Copying solutions into the texture
+	for (auto v : non_boundaries)
+	{
+		mesh_.position(v.first) = Point(X(v.second + m, 0), X(v.second + m, 1), X(v.second + m , 2));
+	}
 }
 
 // ======================================================================
