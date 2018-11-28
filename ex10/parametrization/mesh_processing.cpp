@@ -208,12 +208,15 @@ void MeshProcessing::direct_solve_textures()
     int n_vertices = mesh_.n_vertices();
     //Homework starting from here
 
+	// setup
     auto cotan = mesh_.edge_property<Scalar>("e:weight");
     auto area_inv = mesh_.vertex_property<Scalar>("v:weight");
 
+	// Variable to store vertices and their position in the matrix
     std::map<Mesh::Vertex, int> boundaries;
     std::map<Mesh::Vertex, int> non_boundaries;
 
+	// Storing vertices and their positions in the matrix
     int n = 0, m = 0;
     for (auto v : mesh_.vertices())
     {
@@ -229,14 +232,24 @@ void MeshProcessing::direct_solve_textures()
         }
     }
 
-    Eigen::SparseMatrix<double> minusM(n, n);
-    Eigen::MatrixXd minusB(Eigen::MatrixXd::Zero(n, 2));
+	// Setting up matrices to compute solution
+    Eigen::SparseMatrix<double> minusM(n+m, n+m);
+    Eigen::MatrixXd minusB(Eigen::MatrixXd::Zero(n+m, 2));
     std::vector<Eigen::Triplet<double>> triplets_minusM;
 
+	// Filling matrices with boundary vertices
+	for (auto v : boundaries) {
+		minusB(v.second, 0) = v_texture[v.first][0];
+		minusB(v.second, 1) = v_texture[v.first][1];
+		triplets_minusM.push_back(Eigen::Triplet<double>(v.second, v.second, 1.0));
+	}
+
+	// Filling matrices with non boundary vetices
     for (auto v : non_boundaries)
     {
-        Vec2d total_cotan_weight_boundary(0.0f);
-        Scalar total_cotan_weight_non_boundary = 0.0f;
+		// Storing cotan weights
+        Vec2d zero_vector_boundary_condition(0.0f);
+        Scalar total_cotan_weight = 0.0f;
 
         // Get circulator
         Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v.first);
@@ -250,23 +263,26 @@ void MeshProcessing::direct_solve_textures()
             // i != j , j belongs to neighborhood and vj is non-boundary
             if (!mesh_.is_boundary(neighbor_v))
             {
-                total_cotan_weight_non_boundary += cotan[e];
-                triplets_minusM.push_back(Eigen::Triplet<double>(v.second, non_boundaries.at(neighbor_v), -cotan[e]));
+                total_cotan_weight += cotan[e];
+                triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, non_boundaries.at(neighbor_v) + m, cotan[e]));
             }
             else // i != j , j belongs to neighborhood and vj is boundary
             {
-                total_cotan_weight_boundary += cotan[e] * v_texture[neighbor_v];
+				total_cotan_weight += cotan[e];
+				triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, boundaries.at(neighbor_v), cotan[e]));
             }
         } while (++vh_c != vh_end);
 
-        triplets_minusM.push_back(Eigen::Triplet<double>(v.second, v.second, total_cotan_weight_non_boundary));
+        triplets_minusM.push_back(Eigen::Triplet<double>(v.second+m, v.second+m, -total_cotan_weight));
 
         // Setting - bi
-        minusB(v.second, 0) = total_cotan_weight_boundary[0];
-        minusB(v.second, 1) = total_cotan_weight_boundary[1];
+        minusB(v.second + m, 0) = zero_vector_boundary_condition[0];
+        minusB(v.second + m, 1) = zero_vector_boundary_condition[1];
     }
-
+	// Setting up L
     minusM.setFromTriplets(triplets_minusM.begin(), triplets_minusM.end());
+
+	// Solving for solution
     Eigen::SparseLU<Eigen::SparseMatrix<double>> solver(minusM);
     if (solver.info() != Eigen::Success)
     {
@@ -278,10 +294,11 @@ void MeshProcessing::direct_solve_textures()
         printf("linear solver failed.\n");
     }
 
+	// Copying solutions into the texture
     for (auto v : non_boundaries)
     {
-        v_texture[v.first][0] = X(v.second, 0);
-        v_texture[v.first][1] = X(v.second, 1);
+        v_texture[v.first][0] = X(v.second + m, 0);
+        v_texture[v.first][1] = X(v.second + m, 1);
     }
 
     //Homework stopping from here
