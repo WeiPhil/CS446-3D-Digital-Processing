@@ -12,7 +12,7 @@ solver to it. After a few iterations the mesh converges to two disks (where
 the boundaries originally were) linked by an infinitly thin line.
 
 We observe this result because the cylinder's height is much larger than
-its bases diameter, so the "shortest" path to link the 2 bases (where all the
+its bases diameter, so the "shortest path" to link the 2 bases (where all the
 mesh collapses) is an infinitly thin line. This result is consistent with the
 goal of minimal surface optimization.
 

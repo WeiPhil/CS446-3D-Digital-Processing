@@ -60,9 +60,9 @@ void MeshProcessing::map_suface_boundary_to_circle()
             if (!has_mapped_boundary)
             { // Execute this part only once
 
-				// Accumulator for total boundary edge length
-				double acc_length = 0.f;
-				std::vector<double> boundary_edge_lengths;
+                // Accumulator for total boundary edge length
+                double acc_length = 0.f;
+                std::vector<double> boundary_edge_lengths;
 
                 // starting_halfedge is guaranteed to be a boundary halfedge
                 Mesh::Halfedge starting_halfedge = mesh_.halfedge(v);
@@ -134,72 +134,72 @@ void MeshProcessing::map_suface_boundary_to_circle()
 void MeshProcessing::iterative_solve_textures(int item_times)
 {
     Mesh::Vertex_property<Vec2d> v_texture = mesh_.vertex_property<Vec2d>("v:texture", Vec2d(0.5, 0.5));
-	Mesh::Edge_property<Scalar> e_weight = mesh_.edge_property<Scalar>("e:weight", 0.0f);
-	int n_vertices = mesh_.n_vertices();
-	
-	// Create temporary property
-	Mesh::Vertex_property<Vec2d> v_texture_tmp = mesh_.add_vertex_property<Vec2d>("v:texture_tmp");
+    Mesh::Edge_property<Scalar> e_weight = mesh_.edge_property<Scalar>("e:weight", 0.0f);
+    int n_vertices = mesh_.n_vertices();
 
-	// Repeat the procedure item_times
-	for (size_t i = 0; i < item_times; ++i) 
-	{	
-		// For all vertices
-		for (auto v : mesh_.vertices())
-		{
-			// For non-boundary vertices
-			if (!mesh_.is_boundary(v))
-			{
-				// Get one-ring circulator
-				Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
-				Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
-				if (!vh_c)
-				{
-					continue;
-				}
+    // Create temporary property
+    Mesh::Vertex_property<Vec2d> v_texture_tmp = mesh_.add_vertex_property<Vec2d>("v:texture_tmp");
 
-				// Stores pairs of cotan weight and neighbor vertex texture
-				std::vector<std::pair<Scalar, Vec2d>> cotan_weights_tex_pair;
+    // Repeat the procedure item_times
+    for (size_t i = 0; i < item_times; ++i)
+    {
+        // For all vertices
+        for (auto v : mesh_.vertices())
+        {
+            // For non-boundary vertices
+            if (!mesh_.is_boundary(v))
+            {
+                // Get one-ring circulator
+                Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v);
+                Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
+                if (!vh_c)
+                {
+                    continue;
+                }
 
-				// Accumulator for total cotan weights
-				Scalar acc_cotan_weight = 0.f;
+                // Stores pairs of cotan weight and neighbor vertex texture
+                std::vector<std::pair<Scalar, Vec2d>> cotan_weights_tex_pair;
 
-				// Iterate over neighboring vertices
-				do
-				{
-					Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
-					Mesh::Edge e = mesh_.edge(*vh_c);
-					acc_cotan_weight += e_weight[e];
-					cotan_weights_tex_pair.push_back(std::pair<Scalar, Vec2d>(e_weight[e], v_texture[neighbor_v]));
+                // Accumulator for total cotan weights
+                Scalar acc_cotan_weight = 0.f;
 
-				} while (++vh_c != vh_end);
+                // Iterate over neighboring vertices
+                do
+                {
+                    Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
+                    Mesh::Edge e = mesh_.edge(*vh_c);
+                    acc_cotan_weight += e_weight[e];
+                    cotan_weights_tex_pair.push_back(std::pair<Scalar, Vec2d>(e_weight[e], v_texture[neighbor_v]));
 
-				// Accumulate texture value over all adjacent faces
-				Vec2d acc_new_texture(0.0f);
+                } while (++vh_c != vh_end);
 
-				// Normalize the cotan weights and accumulate new texture value
-				for (auto pair : cotan_weights_tex_pair)
-				{
-					acc_new_texture += (pair.first / acc_cotan_weight) * pair.second;
-				}
+                // Accumulate texture value over all adjacent faces
+                Vec2d acc_new_texture(0.0f);
 
-				// Update texture in temporary property
-				v_texture_tmp[v] = acc_new_texture;
-			}
-		}
+                // Normalize the cotan weights and accumulate new texture value
+                for (auto pair : cotan_weights_tex_pair)
+                {
+                    acc_new_texture += (pair.first / acc_cotan_weight) * pair.second;
+                }
 
-		// Update texture values in v_texture
-		for (auto v : mesh_.vertices())
-		{
-			// For non-boundary vertices
-			if (!mesh_.is_boundary(v))
-			{
-				v_texture[v] = v_texture_tmp[v];
-			}
-		}
-	}
+                // Update texture in temporary property
+                v_texture_tmp[v] = acc_new_texture;
+            }
+        }
 
-	// Remove temporary property
-	mesh_.remove_vertex_property(v_texture_tmp);
+        // Update texture values in v_texture
+        for (auto v : mesh_.vertices())
+        {
+            // For non-boundary vertices
+            if (!mesh_.is_boundary(v))
+            {
+                v_texture[v] = v_texture_tmp[v];
+            }
+        }
+    }
+
+    // Remove temporary property
+    mesh_.remove_vertex_property(v_texture_tmp);
 
     // Update the texture matrix
     texture_ = Eigen::MatrixXf(2, n_vertices);
@@ -219,15 +219,15 @@ void MeshProcessing::direct_solve_textures()
     int n_vertices = mesh_.n_vertices();
     //Homework starting from here
 
-	// setup
+    // setup
     auto cotan = mesh_.edge_property<Scalar>("e:weight");
     auto area_inv = mesh_.vertex_property<Scalar>("v:weight");
 
-	// Variable to store vertices and their position in the matrix
+    // Variable to store vertices and their position in the matrix
     std::map<Mesh::Vertex, int> boundaries;
     std::map<Mesh::Vertex, int> non_boundaries;
 
-	// Storing vertices and their positions in the matrix
+    // Storing vertices and their positions in the matrix
     int n = 0, m = 0;
     for (auto v : mesh_.vertices())
     {
@@ -243,22 +243,23 @@ void MeshProcessing::direct_solve_textures()
         }
     }
 
-	// Setting up matrices to compute solution
-    Eigen::SparseMatrix<double> minusM(n+m, n+m);
-    Eigen::MatrixXd minusB(Eigen::MatrixXd::Zero(n+m, 2));
+    // Setting up matrices to compute solution
+    Eigen::SparseMatrix<double> minusM(n + m, n + m);
+    Eigen::MatrixXd minusB(Eigen::MatrixXd::Zero(n + m, 2));
     std::vector<Eigen::Triplet<double>> triplets_minusM;
 
-	// Filling matrices with boundary vertices
-	for (auto v : boundaries) {
-		minusB(v.second, 0) = v_texture[v.first][0];
-		minusB(v.second, 1) = v_texture[v.first][1];
-		triplets_minusM.push_back(Eigen::Triplet<double>(v.second, v.second, 1.0));
-	}
+    // Filling matrices with boundary vertices
+    for (auto v : boundaries)
+    {
+        minusB(v.second, 0) = v_texture[v.first][0];
+        minusB(v.second, 1) = v_texture[v.first][1];
+        triplets_minusM.push_back(Eigen::Triplet<double>(v.second, v.second, 1.0));
+    }
 
-	// Filling matrices with non boundary vetices
+    // Filling matrices with non boundary vetices
     for (auto v : non_boundaries)
     {
-		// Storing cotan weights
+        // Storing cotan weights
         Vec2d zero_vector_boundary_condition(0.0f);
         Scalar total_cotan_weight = 0.0f;
 
@@ -279,21 +280,21 @@ void MeshProcessing::direct_solve_textures()
             }
             else // i != j , j belongs to neighborhood and vj is boundary
             {
-				total_cotan_weight += cotan[e];
-				triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, boundaries.at(neighbor_v), cotan[e]));
+                total_cotan_weight += cotan[e];
+                triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, boundaries.at(neighbor_v), cotan[e]));
             }
         } while (++vh_c != vh_end);
 
-        triplets_minusM.push_back(Eigen::Triplet<double>(v.second+m, v.second+m, -total_cotan_weight));
+        triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, v.second + m, -total_cotan_weight));
 
         // Setting - bi
         minusB(v.second + m, 0) = zero_vector_boundary_condition[0];
         minusB(v.second + m, 1) = zero_vector_boundary_condition[1];
     }
-	// Setting up L
+    // Setting up L
     minusM.setFromTriplets(triplets_minusM.begin(), triplets_minusM.end());
 
-	// Solving for solution
+    // Solving for solution
     Eigen::SparseLU<Eigen::SparseMatrix<double>> solver(minusM);
     if (solver.info() != Eigen::Success)
     {
@@ -305,7 +306,7 @@ void MeshProcessing::direct_solve_textures()
         printf("linear solver failed.\n");
     }
 
-	// Copying solutions into the texture
+    // Copying solutions into the texture
     for (auto v : non_boundaries)
     {
         v_texture[v.first][0] = X(v.second + m, 0);
@@ -328,113 +329,114 @@ void MeshProcessing::direct_solve_textures()
 // ======================================================================
 void MeshProcessing::minimal_surface()
 {
-	int n_vertices = mesh_.n_vertices();
-	//Homework starting from here
+    int n_vertices = mesh_.n_vertices();
+    //Homework starting from here
 
-	// setup
-	auto cotan = mesh_.edge_property<Scalar>("e:weight");
-	auto area_inv = mesh_.vertex_property<Scalar>("v:weight");
+    // setup
+    auto cotan = mesh_.edge_property<Scalar>("e:weight");
+    auto area_inv = mesh_.vertex_property<Scalar>("v:weight");
 
-	// Variable to store vertices and their position in the matrix
-	std::map<Mesh::Vertex, int> boundaries;
-	std::map<Mesh::Vertex, int> non_boundaries;
+    // Variable to store vertices and their position in the matrix
+    std::map<Mesh::Vertex, int> boundaries;
+    std::map<Mesh::Vertex, int> non_boundaries;
 
-	// Storing vertices and their positions in the matrix
-	int n = 0, m = 0;
-	for (auto v : mesh_.vertices())
-	{
-		if (!mesh_.is_boundary(v))
-		{
-			non_boundaries.emplace(v, n);
-			n++;
-		}
-		else
-		{
-			boundaries.emplace(v, m);
-			m++;
-		}
-	}
+    // Storing vertices and their positions in the matrix
+    int n = 0, m = 0;
+    for (auto v : mesh_.vertices())
+    {
+        if (!mesh_.is_boundary(v))
+        {
+            non_boundaries.emplace(v, n);
+            n++;
+        }
+        else
+        {
+            boundaries.emplace(v, m);
+            m++;
+        }
+    }
 
-	// Setting up matrices to compute solution
-	Eigen::SparseMatrix<double> minusM(n + m, n + m);
-	Eigen::MatrixXd minusB(Eigen::MatrixXd::Zero(n + m, 3));
-	std::vector<Eigen::Triplet<double>> triplets_minusM;
+    // Setting up matrices to compute solution
+    Eigen::SparseMatrix<double> minusM(n_vertices, n_vertices);
+    Eigen::MatrixXd minusB(Eigen::MatrixXd::Zero(n_vertices, 3));
+    std::vector<Eigen::Triplet<double>> triplets_minusM;
 
-	// Filling matrices with boundary vertices
-	for (auto v : boundaries) {
-		minusB(v.second, 0) = mesh_.position(v.first)[0];
-		minusB(v.second, 1) = mesh_.position(v.first)[1];
-		minusB(v.second, 2) = mesh_.position(v.first)[2];
-		triplets_minusM.push_back(Eigen::Triplet<double>(v.second, v.second, 1.0));
-	}
+    // Filling matrices with boundary vertices
+    for (auto v : boundaries)
+    {
+        minusB(v.second, 0) = mesh_.position(v.first)[0];
+        minusB(v.second, 1) = mesh_.position(v.first)[1];
+        minusB(v.second, 2) = mesh_.position(v.first)[2];
+        triplets_minusM.push_back(Eigen::Triplet<double>(v.second, v.second, 1.0));
+    }
 
-	// Filling matrices with non boundary vetices
-	for (auto v : non_boundaries)
-	{
-		// Storing cotan weights
-		Vec3d zero_vector_boundary_condition(0.0f);
-		Scalar total_cotan_weight = 0.0f;
+    // Filling matrices with non boundary vetices
+    for (auto v : non_boundaries)
+    {
+        // Storing cotan weights
+        Vec3d zero_vector_boundary_condition(0.0f);
+        Scalar total_cotan_weight = 0.0f;
 
-		// Get circulator
-		Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v.first);
-		Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
+        // Get circulator
+        Mesh::Halfedge_around_vertex_circulator vh_c = mesh_.halfedges(v.first);
+        Mesh::Halfedge_around_vertex_circulator vh_end = vh_c;
 
-		// Iterate over neighbors for each non-boundary vertex
-		do
-		{
-			Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
-			Mesh::Edge e = mesh_.edge(*vh_c);
-			// i != j , j belongs to neighborhood and vj is non-boundary
-			if (!mesh_.is_boundary(neighbor_v))
-			{
-				// Cotan Laplacian
-				total_cotan_weight += cotan[e];
-				triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, non_boundaries.at(neighbor_v) + m, cotan[e]));
+        // Iterate over neighbors for each non-boundary vertex
+        do
+        {
+            Mesh::Vertex neighbor_v = mesh_.to_vertex(*vh_c);
+            Mesh::Edge e = mesh_.edge(*vh_c);
+            // i != j , j belongs to neighborhood and vj is non-boundary
+            if (!mesh_.is_boundary(neighbor_v))
+            {
+                // Cotan Laplacian
+                total_cotan_weight += cotan[e];
+                triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, non_boundaries.at(neighbor_v) + m, cotan[e]));
 
-				// Uniform Laplacian
-				//total_cotan_weight += 1.0;
-				//triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, non_boundaries.at(neighbor_v) + m, 1.0));
-			}
-			else // i != j , j belongs to neighborhood and vj is boundary
-			{
-				// Cotan laplacian
-				total_cotan_weight += cotan[e];
-				triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, boundaries.at(neighbor_v), cotan[e]));
+                // Uniform Laplacian
+                // total_cotan_weight += 1.0;
+                // triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, non_boundaries.at(neighbor_v) + m, 1.0));
+            }
+            else // i != j , j belongs to neighborhood and vj is boundary
+            {
+                // Cotan laplacian
+                total_cotan_weight += cotan[e];
+                triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, boundaries.at(neighbor_v), cotan[e]));
 
-				// Uniform Laplacian
-				//total_cotan_weight += 1.0;
-				//triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, boundaries.at(neighbor_v) + m, 1.0));
-			}
-		} while (++vh_c != vh_end);
+                // Uniform Laplacian
+                // total_cotan_weight += 1.0;
+                // triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, boundaries.at(neighbor_v) + m, 1.0));
+            }
+        } while (++vh_c != vh_end);
 
-		triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, v.second + m, -total_cotan_weight));
+        triplets_minusM.push_back(Eigen::Triplet<double>(v.second + m, v.second + m, -total_cotan_weight));
 
-		// Setting - bi
-		minusB(v.second + m, 0) = zero_vector_boundary_condition[0];
-		minusB(v.second + m, 1) = zero_vector_boundary_condition[1];
-		minusB(v.second + m, 2) = zero_vector_boundary_condition[2];
-	}
+        // Setting - bi
+        minusB(v.second + m, 0) = zero_vector_boundary_condition[0];
+        minusB(v.second + m, 1) = zero_vector_boundary_condition[1];
+        minusB(v.second + m, 2) = zero_vector_boundary_condition[2];
+    }
 
-	// Setting up L
-	minusM.setFromTriplets(triplets_minusM.begin(), triplets_minusM.end());
+    // Setting up L
+    minusM.setFromTriplets(triplets_minusM.begin(), triplets_minusM.end());
 
-	// Solving for solution
-	Eigen::SparseLU<Eigen::SparseMatrix<double>> solver(minusM);
-	if (solver.info() != Eigen::Success)
-	{
-		printf("linear solver init failed.\n");
-	}
-	Eigen::MatrixXd X = solver.solve(minusB);
-	if (solver.info() != Eigen::Success)
-	{
-		printf("linear solver failed.\n");
-	}
+    // Solving for solution
+    Eigen::SparseLU<Eigen::SparseMatrix<double>> solver(minusM);
+    if (solver.info() != Eigen::Success)
+    {
+        printf("linear solver init failed.\n");
+    }
+    Eigen::MatrixXd X = solver.solve(minusB);
+    if (solver.info() != Eigen::Success)
+    {
+        printf("linear solver failed.\n");
+    }
 
-	// Copying solutions into the texture
-	for (auto v : non_boundaries)
-	{
-		mesh_.position(v.first) = Point(X(v.second + m, 0), X(v.second + m, 1), X(v.second + m , 2));
-	}
+    // Copying solutions into the texture
+    for (auto v : non_boundaries)
+    {
+        mesh_.position(v.first) = Point(X(v.second + m, 0), X(v.second + m, 1), X(v.second + m, 2));
+    }
 }
 
 // ======================================================================
