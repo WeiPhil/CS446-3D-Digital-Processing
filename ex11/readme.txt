@@ -21,7 +21,9 @@ once the bending is done.
 
 - Comparing with Physical Deformation
 
-None. // TODO?
+The difference comes when we deform to the extreme, real materials would snap or break whereas 
+here any deformations are accepted. Another difference is self-intresection, such things aren't possible
+in the physical world.
 
 ----------------------------------
 
