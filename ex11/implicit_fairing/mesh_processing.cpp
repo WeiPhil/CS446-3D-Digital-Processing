@@ -54,8 +54,8 @@ void MeshProcessing::deformation_axis(int mode)
     auto fixedPointBegin = fixed_faces_points_indices_.begin();
     auto fixedPointEnd = fixed_faces_points_indices_.end();
 
-    auto shiftedPointBegin = fixed_faces_points_indices_.begin();
-    auto shiftedPointEnd = fixed_faces_points_indices_.end();
+    auto shiftedPointBegin = shifted_faces_points_indices_.begin();
+    auto shiftedPointEnd = shifted_faces_points_indices_.end();
 
     for (int i = 0; i < N; ++i)
     {
@@ -78,22 +78,31 @@ void MeshProcessing::deformation_axis(int mode)
             Mesh::Edge e = mesh_.edge(*vh_c);
             total_cotan_weight += cotan[e];
 
+			// Uniform
+			//total_cotan_weight += 1.0;
+
             // Component (i,j) of the laplace matrix i != j
             triplets_L.push_back(Eigen::Triplet<double>(i, neighbor_v.idx(), cotan[e]));
+
+			//Uniform
+			//triplets_L.push_back(Eigen::Triplet<double>(i, neighbor_v.idx(), 1.0));
 
         } while (++vh_c != vh_end);
 
         // Diagonal component (i,i) of the laplace matrix
         triplets_L.push_back(Eigen::Triplet<double>(i, i, -total_cotan_weight));
 
-        // We also need to set the rhs to one if it's constrained
-        if (std::find(fixedPointBegin, fixedPointEnd, i) != fixedPointEnd)
-        {
-            rhs(i) = 1.0;
-        }
+        // We also need to set the rhs to the displacement if it isn't constrained
+        if (std::find(shiftedPointBegin, shiftedPointEnd, i) != shiftedPointEnd)
+		{
+			rhs(i) = displacement_[mode];
+		}
     }
 
     L.setFromTriplets(triplets_L.begin(), triplets_L.end());
+
+	// compute l^2
+	L = L * L;
 
     // Iterating over all the columns
     for (int k = 0; k < L.outerSize(); ++k)
@@ -110,16 +119,15 @@ void MeshProcessing::deformation_axis(int mode)
             }
             else if ((std::find(shiftedPointBegin, shiftedPointEnd, k) != shiftedPointEnd))
             {
-                if (vecIdx == k)
-                    L.coeffRef(k, it.index()) = displacement_[mode];
+				if (vecIdx == k)
+					L.coeffRef(k, it.index()) = 1.0;
                 else
                     L.coeffRef(k, it.index()) = 0.0;
             }
         }
     }
 
-    L = L * L;
-
+	// Solve
     Eigen::SparseLU<Eigen::SparseMatrix<double>>
         solver(L);
     if (solver.info() != Eigen::Success)
@@ -132,7 +140,6 @@ void MeshProcessing::deformation_axis(int mode)
         printf("linear solver failed.\n");
     }
 
-    cout << X << endl;
     for (int i = 0; i < N; ++i)
     {
         if (!(std::find(fixedPointBegin, fixedPointEnd, i) != fixedPointEnd))
