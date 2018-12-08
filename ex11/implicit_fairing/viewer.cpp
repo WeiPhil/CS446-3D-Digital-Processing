@@ -12,7 +12,8 @@
 //-----------------------------------------------------------------------------
 #include "viewer.h"
 
-void Viewer::select_point(const Eigen::Vector2i & pixel) {
+void Viewer::select_point(const Eigen::Vector2i &pixel)
+{
 	Eigen::Matrix4f model, view, projection;
 	computeCameraMatrices(model, view, projection);
 	Matrix4f MVP = projection * view * model;
@@ -27,7 +28,8 @@ void Viewer::select_point(const Eigen::Vector2i & pixel) {
 	cout << contraint_indices_[0] << " " << contraint_indices_[1] << " " << contraint_indices_[2] << " " << contraint_indices_[3] << endl;
 }
 
-void Viewer::select_face(const Eigen::Vector2i & pixel, int mode) {
+void Viewer::select_face(const Eigen::Vector2i &pixel, int mode)
+{
 	Eigen::Matrix4f model, view, projection;
 	computeCameraMatrices(model, view, projection);
 	Matrix4f MVP = projection * view * model;
@@ -43,29 +45,35 @@ void Viewer::select_face(const Eigen::Vector2i & pixel, int mode) {
 	cout << closest_index << endl;
 }
 
-bool Viewer::keyboardEvent(int key, int scancode, int action, int modifiers) {
-	if (Screen::keyboardEvent(key, scancode, action, modifiers)) {
+bool Viewer::keyboardEvent(int key, int scancode, int action, int modifiers)
+{
+	if (Screen::keyboardEvent(key, scancode, action, modifiers))
+	{
 		return true;
 	}
-	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+	{
 		setVisible(false);
 		return true;
 	}
 	return false;
 }
 
-void Viewer::draw(NVGcontext *ctx) {
+void Viewer::draw(NVGcontext *ctx)
+{
 	/* Draw the user interface */
 	Screen::draw(ctx);
 }
 
-Vector2f Viewer::getScreenCoord() {
+Vector2f Viewer::getScreenCoord()
+{
 	Vector2i pos = mousePos();
 	return Vector2f(2.0f * (float)pos.x() / width() - 1.0f,
-		1.0f - 2.0f * (float)pos.y() / height());
+					1.0f - 2.0f * (float)pos.y() / height());
 }
 
-void Viewer::drawContents() {
+void Viewer::drawContents()
+{
 	using namespace nanogui;
 
 	/* Draw the window contents using OpenGL */
@@ -74,9 +82,9 @@ void Viewer::drawContents() {
 	Eigen::Matrix4f model, view, proj;
 	computeCameraMatrices(model, view, proj);
 
-	Matrix4f mv = view*model;
+	Matrix4f mv = view * model;
 	Matrix4f p = proj;
-	
+
 	/* MVP uniforms */
 	shader_.setUniform("MV", mv);
 	shader_.setUniform("P", p);
@@ -86,7 +94,8 @@ void Viewer::drawContents() {
 	glDisable(GL_CULL_FACE);
 
 	// Render everything
-	if (wireframe_) {
+	if (wireframe_)
+	{
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		glPolygonOffset(1.0, 1.0);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -94,15 +103,18 @@ void Viewer::drawContents() {
 
 	Vector3f colors(1.0, 1.0, 1.0);
 	shader_.setUniform("intensity", colors);
-	if (color_mode == CURVATURE) {
+	if (color_mode == CURVATURE)
+	{
 		shader_.setUniform("color_mode", int(curvature_type));
 	}
-	else {
+	else
+	{
 		shader_.setUniform("color_mode", int(color_mode));
 	}
 	shader_.drawIndexed(GL_TRIANGLES, 0, mesh_->get_number_of_face());
 
-	if (wireframe_) {
+	if (wireframe_)
+	{
 		glDisable(GL_POLYGON_OFFSET_FILL);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		colors << 0.6, 0.6, 0.6;
@@ -111,14 +123,16 @@ void Viewer::drawContents() {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
 
-	if (normals_) {
+	if (normals_)
+	{
 		shaderNormals_.bind();
 		shaderNormals_.setUniform("MV", mv);
 		shaderNormals_.setUniform("P", p);
 		shaderNormals_.drawIndexed(GL_TRIANGLES, 0, mesh_->get_number_of_face());
 	}
 
-	if (displacement_) {
+	if (displacement_)
+	{
 		glEnable(GL_LINE_SMOOTH);
 		glLineWidth(3.0);
 		shaderDisplacement_.bind();
@@ -133,80 +147,94 @@ void Viewer::drawContents() {
 	shaderSelection_.setUniform("P", p);
 	glEnable(GL_PROGRAM_POINT_SIZE);
 	shaderSelection_.drawIndexed(GL_POINTS, 0, mesh_->get_number_of_face());
-	glDisable(GL_PROGRAM_POINT_SIZE);		
+	glDisable(GL_PROGRAM_POINT_SIZE);
 
-	if (mesh_->fixed_faces_points_.size() > 0) {
+	if (mesh_->fixed_faces_points_.size() > 0)
+	{
 		shaderFixedFaces_.bind();
 		shaderFixedFaces_.setUniform("MV", mv);
 		shaderFixedFaces_.setUniform("P", p);
 		shaderFixedFaces_.drawIndexed(GL_TRIANGLES, 0, mesh_->fixed_faces_points_.size() / 3);
 	}
-	if (mesh_->shifted_faces_points_.size() > 0) {
+	if (mesh_->shifted_faces_points_.size() > 0)
+	{
 		shaderShiftedFaces_.bind();
 		shaderShiftedFaces_.setUniform("MV", mv);
 		shaderShiftedFaces_.setUniform("P", p);
 		shaderShiftedFaces_.drawIndexed(GL_TRIANGLES, 0, mesh_->shifted_faces_points_.size() / 3);
 	}
-	 
 }
 
-bool Viewer::scrollEvent(const Vector2i &p, const Vector2f &rel) {
-	if (!Screen::scrollEvent(p, rel)) {
+bool Viewer::scrollEvent(const Vector2i &p, const Vector2f &rel)
+{
+	if (!Screen::scrollEvent(p, rel))
+	{
 		camera_.zoom = max(0.1, camera_.zoom * (rel.y() > 0 ? 1.1 : 0.9));
 	}
 	return true;
 }
 
 bool Viewer::mouseMotionEvent(const Vector2i &p, const Vector2i &rel,
-	int button, int modifiers) {
+							  int button, int modifiers)
+{
 
-	if (!Screen::mouseMotionEvent(p, rel, button, modifiers)) {
-		if (camera_.arcball.motion(p)) {
+	if (!Screen::mouseMotionEvent(p, rel, button, modifiers))
+	{
+		if (camera_.arcball.motion(p))
+		{
 			//
 		}
-		else if (translate_) {
+		else if (translate_)
+		{
 			Eigen::Matrix4f model, view, proj;
 			computeCameraMatrices(model, view, proj);
 			Point mesh_center = mesh_->get_mesh_center();
 			float zval = nanogui::project(Vector3f(mesh_center.x,
-				mesh_center.y,
-				mesh_center.z),
-				view * model, proj, mSize).z();
+												   mesh_center.y,
+												   mesh_center.z),
+										  view * model, proj, mSize)
+							 .z();
 			Eigen::Vector3f pos1 = nanogui::unproject(
 				Eigen::Vector3f(p.x(), mSize.y() - p.y(), zval),
 				view * model, proj, mSize);
 			Eigen::Vector3f pos0 = nanogui::unproject(
-				Eigen::Vector3f(translateStart_.x(), mSize.y() -
-					translateStart_.y(), zval), view * model, proj, mSize);
+				Eigen::Vector3f(translateStart_.x(), mSize.y() - translateStart_.y(), zval), view * model, proj, mSize);
 			camera_.modelTranslation = camera_.modelTranslation_start + (pos1 - pos0);
 		}
 	}
 	return true;
 }
 
-bool Viewer::mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers) {
-	if (!Screen::mouseButtonEvent(p, button, down, modifiers)) {
-		if (button == GLFW_MOUSE_BUTTON_1 && modifiers == 0) {
+bool Viewer::mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers)
+{
+	if (!Screen::mouseButtonEvent(p, button, down, modifiers))
+	{
+		if (button == GLFW_MOUSE_BUTTON_1 && modifiers == 0)
+		{
 			camera_.arcball.button(p, down);
 		}
 		else if (button == GLFW_MOUSE_BUTTON_2 ||
-			(button == GLFW_MOUSE_BUTTON_1 && modifiers == GLFW_MOD_SHIFT)) {
+				 (button == GLFW_MOUSE_BUTTON_1 && modifiers == GLFW_MOD_SHIFT))
+		{
 			camera_.modelTranslation_start = camera_.modelTranslation;
 			translate_ = true;
 			translateStart_ = p;
 		}
-		else if (button == GLFW_MOUSE_BUTTON_1 && modifiers == GLFW_MOD_CONTROL && !down) {
+		else if (button == GLFW_MOUSE_BUTTON_1 && modifiers == GLFW_MOD_CONTROL && !down)
+		{
 			//select_point(Eigen::Vector2i(p.x(), mSize.y() - p.y()));
 			//refresh_selection();
 			cout << "fixed_faces_ = " << fixed_faces_ << endl;
 			cout << "shifted_faces_ = " << shifted_faces_ << endl;
 			cout << "# fixed points = " << mesh_->fixed_faces_points_.size() << endl;
 			cout << "# shifted points = " << mesh_->shifted_faces_points_.size() << endl;
-			if (fixed_faces_) {
+			if (fixed_faces_)
+			{
 				select_face(Eigen::Vector2i(p.x(), mSize.y() - p.y()), 0);
 				refresh_selected_faces();
 			}
-			if (shifted_faces_) {
+			if (shifted_faces_)
+			{
 				select_face(Eigen::Vector2i(p.x(), mSize.y() - p.y()), 1);
 				refresh_selected_faces();
 			}
@@ -214,16 +242,19 @@ bool Viewer::mouseButtonEvent(const Vector2i &p, int button, bool down, int modi
 			cout << "# shifted points = " << mesh_->shifted_faces_points_.size() << endl;
 		}
 	}
-	if (button == GLFW_MOUSE_BUTTON_1 && !down) {
+	if (button == GLFW_MOUSE_BUTTON_1 && !down)
+	{
 		camera_.arcball.button(p, false);
 	}
-	if (!down) {
+	if (!down)
+	{
 		translate_ = false;
 	}
 	return true;
 }
 
-void Viewer::initShaders() {
+void Viewer::initShaders()
+{
 	// Shaders
 	shader_.init(
 		"a_simple_shader",
@@ -303,8 +334,7 @@ void Viewer::initShaders() {
 		"        c = intensity;\n"
 		"    }\n"
 		"    color = vec4(c, 1.0);\n"
-		"}"
-	);
+		"}");
 
 	shaderNormals_.init(
 		"normal_shader",
@@ -354,31 +384,29 @@ void Viewer::initShaders() {
 		"   createline(0);\n"
 		"   createline(1);\n"
 		"   createline(2);\n"
-		"}"
-	);
+		"}");
 
 	shaderSelection_.init(
-	"selection_shader",
+		"selection_shader",
 
-	"#version 330\n"
-	"in vec3 position;\n"
-	"uniform mat4 MV;\n"
-	"uniform mat4 P;\n"
-	"void main() {\n"
-	"    vec4 vpoint_mv = MV * vec4(position, 1.0);\n"
-	"    gl_Position = P * vpoint_mv;\n"
-	"    gl_PointSize = 10.0;\n"
-	"}",
+		"#version 330\n"
+		"in vec3 position;\n"
+		"uniform mat4 MV;\n"
+		"uniform mat4 P;\n"
+		"void main() {\n"
+		"    vec4 vpoint_mv = MV * vec4(position, 1.0);\n"
+		"    gl_Position = P * vpoint_mv;\n"
+		"    gl_PointSize = 10.0;\n"
+		"}",
 
-	"#version 330\n"
-	"out vec4 color;\n"
-	"void main() {\n"
-	"	 if (gl_PrimitiveID == 0) color = vec4(0.7, 0.0, 0.2, 1.0);\n"
-	"	 if (gl_PrimitiveID == 1) color = vec4(0.3, 0.2, 0.7, 1.0);\n"
-	"	 if (gl_PrimitiveID == 2) color = vec4(0.13, 0.7, 0.3, 1.0);\n"
-	"	 if (gl_PrimitiveID == 3) color = vec4(1, 0.5, 0.15, 1.0);\n"
-	"}"
-	);
+		"#version 330\n"
+		"out vec4 color;\n"
+		"void main() {\n"
+		"	 if (gl_PrimitiveID == 0) color = vec4(0.7, 0.0, 0.2, 1.0);\n"
+		"	 if (gl_PrimitiveID == 1) color = vec4(0.3, 0.2, 0.7, 1.0);\n"
+		"	 if (gl_PrimitiveID == 2) color = vec4(0.13, 0.7, 0.3, 1.0);\n"
+		"	 if (gl_PrimitiveID == 3) color = vec4(1, 0.5, 0.15, 1.0);\n"
+		"}");
 
 	shaderDisplacement_.init(
 		"isolines_shader",
@@ -396,8 +424,7 @@ void Viewer::initShaders() {
 		"out vec4 color;\n"
 		"void main() {\n"
 		"   color = vec4(1.0, 1.0, 1.0, 0.0);\n"
-		"}"
-	);
+		"}");
 
 	shaderFixedFaces_.init(
 		"a_simple_shader",
@@ -417,8 +444,7 @@ void Viewer::initShaders() {
 		"out vec4 color;\n"
 		"void main() {\n"
 		"    color = vec4(1.0, 0.5, 0.0, 0.5);\n"
-		"}"
-	);
+		"}");
 
 	shaderShiftedFaces_.init(
 		"a_simple_shader",
@@ -438,11 +464,11 @@ void Viewer::initShaders() {
 		"out vec4 color;\n"
 		"void main() {\n"
 		"    color = vec4(0.0, 0.5, 1.0, 0.5);\n"
-		"}"
-	);
+		"}");
 }
 
-Viewer::Viewer() : nanogui::Screen(Eigen::Vector2i(1024, 768), "DGP Viewer") {
+Viewer::Viewer() : nanogui::Screen(Eigen::Vector2i(1024, 768), "DGP Viewer")
+{
 
 	window_ = new Window(this, "Controls");
 	window_->setPosition(Vector2i(15, 15));
@@ -452,7 +478,14 @@ Viewer::Viewer() : nanogui::Screen(Eigen::Vector2i(1024, 768), "DGP Viewer") {
 	Popup *popup = popupBtn->popup();
 	popup->setLayout(new GroupLayout());
 
-	Button* b = new Button(popup, "Bunny");
+	Button *b = new Button(popup, "Cat");
+	b->setCallback([this]() {
+		mesh_->load_mesh("../../ownModelData/cat_highres_preprocessed.obj");
+		this->refresh_mesh();
+		this->refresh_trackball_center();
+	});
+
+	b = new Button(popup, "Bunny");
 	b->setCallback([this]() {
 		mesh_->load_mesh("../data/bunny.off");
 		this->refresh_mesh();
@@ -467,12 +500,13 @@ Viewer::Viewer() : nanogui::Screen(Eigen::Vector2i(1024, 768), "DGP Viewer") {
 
 	b = new Button(popup, "Open mesh ...");
 	b->setCallback([this]() {
-		string filename = nanogui::file_dialog({ { "obj", "Wavefront OBJ" },
-		{ "ply", "Stanford PLY" },
-		{ "aln", "Aligned point cloud" },
-		{ "off", "Object File Format" }
-		}, false);
-		if (filename != "") {
+		string filename = nanogui::file_dialog({{"obj", "Wavefront OBJ"},
+												{"ply", "Stanford PLY"},
+												{"aln", "Aligned point cloud"},
+												{"off", "Object File Format"}},
+											   false);
+		if (filename != "")
+		{
 			mesh_->fixed_faces_points_.clear();
 			mesh_->fixed_faces_points_indices_.clear();
 			mesh_->shifted_faces_points_.clear();
@@ -542,11 +576,13 @@ Viewer::Viewer() : nanogui::Screen(Eigen::Vector2i(1024, 768), "DGP Viewer") {
 
 	b = new Button(window_, "Set Displacement");
 	b->setCallback([this]() {
-		if (mesh_->shifted_faces_points_.size() > 0) {
+		if (mesh_->shifted_faces_points_.size() > 0)
+		{
 			mesh_->displacement_points_.clear();
 			this->displacement_ = true;
 			surface_mesh::Point p = surface_mesh::Point(0, 0, 0);
-			for (size_t i = 0; i < mesh_->shifted_faces_points_.size(); i++) {
+			for (size_t i = 0; i < mesh_->shifted_faces_points_.size(); i++)
+			{
 				p += mesh_->shifted_faces_points_[i];
 			}
 			p /= mesh_->shifted_faces_points_.size();
@@ -572,12 +608,13 @@ Viewer::Viewer() : nanogui::Screen(Eigen::Vector2i(1024, 768), "DGP Viewer") {
 	performLayout();
 
 	initShaders();
-	mesh_ = new mesh_processing::MeshProcessing("../data/bunny_1000.obj");
+	mesh_ = new mesh_processing::MeshProcessing("../../ownModelData/cat_highres_preprocessed.obj");
 	this->refresh_mesh();
 	this->refresh_trackball_center();
 }
 
-void Viewer::refresh_trackball_center() {
+void Viewer::refresh_trackball_center()
+{
 	// Re-center the mesh
 	Point mesh_center = mesh_->get_mesh_center();
 	camera_.arcball = Arcball();
@@ -586,7 +623,8 @@ void Viewer::refresh_trackball_center() {
 	camera_.modelTranslation = -Vector3f(mesh_center.x, mesh_center.y, mesh_center.z);
 }
 
-void Viewer::refresh_mesh() {
+void Viewer::refresh_mesh()
+{
 	shader_.bind();
 	shader_.uploadIndices(*(mesh_->get_indices()));
 	shader_.uploadAttrib("position", *(mesh_->get_points()));
@@ -611,7 +649,8 @@ void Viewer::refresh_mesh() {
 	refresh_selected_faces();
 }
 
-void Viewer::refresh_selection() {
+void Viewer::refresh_selection()
+{
 	shaderSelection_.bind();
 	Eigen::Matrix<uint32_t, Eigen::Dynamic, Eigen::Dynamic> indices = Eigen::Matrix<uint32_t, Eigen::Dynamic, Eigen::Dynamic>(4, 1);
 	indices << 0, 1, 2, 3;
@@ -620,18 +659,22 @@ void Viewer::refresh_selection() {
 	shaderSelection_.uploadAttrib("position", selection);
 }
 
-void Viewer::refresh_selected_faces() {
+void Viewer::refresh_selected_faces()
+{
 
-	if (fixed_faces_ && mesh_->fixed_faces_points_.size() > 0) {
+	if (fixed_faces_ && mesh_->fixed_faces_points_.size() > 0)
+	{
 		shaderFixedFaces_.bind();
 		Eigen::MatrixXf points_selected_faces_ = Eigen::MatrixXf(3, mesh_->fixed_faces_points_.size());
-		for (size_t i = 0; i < mesh_->fixed_faces_points_.size(); i++) {
+		for (size_t i = 0; i < mesh_->fixed_faces_points_.size(); i++)
+		{
 			points_selected_faces_.col(i) << mesh_->fixed_faces_points_[i].x,
 				mesh_->fixed_faces_points_[i].y,
 				mesh_->fixed_faces_points_[i].z;
 		}
 		Eigen::Matrix<uint32_t, Eigen::Dynamic, Eigen::Dynamic> indices = Eigen::Matrix<uint32_t, Eigen::Dynamic, Eigen::Dynamic>(3, mesh_->fixed_faces_points_.size() / 3);
-		for (size_t i = 0; i < mesh_->fixed_faces_points_.size() / 3; i++) {
+		for (size_t i = 0; i < mesh_->fixed_faces_points_.size() / 3; i++)
+		{
 			indices.col(i) << 3 * i, 3 * i + 1, 3 * i + 2;
 		}
 
@@ -639,16 +682,19 @@ void Viewer::refresh_selected_faces() {
 		shaderFixedFaces_.uploadAttrib("position", points_selected_faces_);
 	}
 
-	if (shifted_faces_ && mesh_->shifted_faces_points_.size() > 0) {
+	if (shifted_faces_ && mesh_->shifted_faces_points_.size() > 0)
+	{
 		shaderShiftedFaces_.bind();
 		Eigen::MatrixXf points_selected_faces_ = Eigen::MatrixXf(3, mesh_->shifted_faces_points_.size());
-		for (size_t i = 0; i < mesh_->shifted_faces_points_.size(); i++) {
+		for (size_t i = 0; i < mesh_->shifted_faces_points_.size(); i++)
+		{
 			points_selected_faces_.col(i) << mesh_->shifted_faces_points_[i].x,
 				mesh_->shifted_faces_points_[i].y,
 				mesh_->shifted_faces_points_[i].z;
 		}
 		Eigen::Matrix<uint32_t, Eigen::Dynamic, Eigen::Dynamic> indices = Eigen::Matrix<uint32_t, Eigen::Dynamic, Eigen::Dynamic>(3, mesh_->shifted_faces_points_.size() / 3);
-		for (size_t i = 0; i < mesh_->shifted_faces_points_.size() / 3; i++) {
+		for (size_t i = 0; i < mesh_->shifted_faces_points_.size() / 3; i++)
+		{
 			indices.col(i) << 3 * i, 3 * i + 1, 3 * i + 2;
 		}
 
@@ -657,21 +703,22 @@ void Viewer::refresh_selected_faces() {
 	}
 }
 
-void Viewer::refresh_isolines() {
+void Viewer::refresh_isolines()
+{
 	shaderDisplacement_.bind();
 	MatrixXf isolines_matrix(3, mesh_->displacement_points_.size());
 	for (size_t j = 0; j < mesh_->displacement_points_.size(); j++)
-		isolines_matrix.col(j) <<
-		mesh_->displacement_points_[j].x,
-		mesh_->displacement_points_[j].y,
-		mesh_->displacement_points_[j].z;
+		isolines_matrix.col(j) << mesh_->displacement_points_[j].x,
+			mesh_->displacement_points_[j].y,
+			mesh_->displacement_points_[j].z;
 
 	shaderDisplacement_.uploadAttrib("position", isolines_matrix);
 }
 
 void Viewer::computeCameraMatrices(Eigen::Matrix4f &model,
-	Eigen::Matrix4f &view,
-	Eigen::Matrix4f &proj) {
+								   Eigen::Matrix4f &view,
+								   Eigen::Matrix4f &proj)
+{
 
 	view = nanogui::lookAt(camera_.eye, camera_.center, camera_.up);
 
@@ -685,7 +732,8 @@ void Viewer::computeCameraMatrices(Eigen::Matrix4f &model,
 	model = nanogui::translate(model, camera_.modelTranslation);
 }
 
-Viewer::~Viewer() {
+Viewer::~Viewer()
+{
 	shader_.free();
 	shaderNormals_.free();
 }
